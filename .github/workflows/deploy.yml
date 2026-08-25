@@ -56,9 +56,12 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
-        # The generate-environment prestart/prebuild script reads these
-        # from process.env - see .env.example and scripts/generate-environment.mjs.
+      - name: Generate environment.ts
+        # scripts/generate-environment.mjs reads process.env and writes
+        # src/environments/environment.ts. It normally runs as the
+        # `prebuild` npm hook, but we invoke ng build directly below
+        # (so we can pass --base-href), which bypasses npm's script
+        # lifecycle - so run the generator explicitly here first.
         env:
           FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
@@ -68,6 +71,9 @@ jobs:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           GOOGLE_AUTH_HD: ${{ secrets.GOOGLE_AUTH_HD }}
           ENABLE_DIAGNOSTICS_LINK: ${{ vars.ENABLE_DIAGNOSTICS_LINK || 'true' }}
+        run: node scripts/generate-environment.mjs
+
+      - name: Build
         run: |
           npx ng build --configuration production \
             --base-href "/${{ github.event.repository.name }}/"
