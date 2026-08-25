@@ -3,76 +3,138 @@ import { parseLcrRoster } from '../src/app/core/lcr-parser';
 import { extractInScopeCallings } from '../src/app/core/callings-vocabulary';
 
 const HEADER =
-  'Preferred Name\tUnit\tCallings\tPriesthood office\tMembership Number\tIndividual E-mail\tIndividual Phone';
+  'Full Name\tBirth Year\tUnit\tIndividual Phone\tPreferred Name\tIndividual E-mail\tCallings with Date Sustained\tPriesthood office';
 
 function tsv(...rows: string[]): string {
   return [HEADER, ...rows].join('\n');
 }
 
 describe('parseLcrRoster', () => {
-  it('parses a well-formed row with an in-scope calling', () => {
+  it('parses a well-formed row and derives the id from name + birth year', () => {
     const out = parseLcrRoster(
-      tsv('Smith, John\tAsheville Ward\tBishop\tHigh Priest\t123456789\tjohn@example.com\t(828) 555-1212'),
+      tsv(
+        'Smith, John Andrew\t1970\tAsheville Ward\t(555) 555-0000\tSmith, John\t' +
+          'sample@example.com\tStake Clerk (15 Jun 2025)\tElder',
+      ),
     );
     expect(out.errors).toEqual([]);
     expect(out.rows).toHaveLength(1);
     expect(out.rows[0]).toMatchObject({
-      mrn: '123456789',
-      name: 'John Smith',
-      // Unit is stored as the Church-issued unit number, not the display name.
+      id: 'john-andrew-smith-1970',
+      fullName: 'John Andrew Smith',
+      displayName: 'John Smith',
+      birthYear: 1970,
       unit: '139173',
       unitName: 'Asheville Ward',
-      callings: ['Bishop'],
-      email: 'john@example.com',
-      phone: '(828) 555-1212',
+      callings: ['Stake Clerk'],
+      sustainedAt: { 'Stake Clerk': '2025-06-15' },
+      email: 'sample@example.com',
+      phone: '(555) 555-0000',
     });
+  });
+
+  it('falls back to Full Name when Preferred Name is empty', () => {
+    const out = parseLcrRoster(
+      tsv('Smith, John\t1970\tAsheville Ward\t\t\tjohn@example.com\tBishop\t'),
+    );
+    expect(out.rows[0].displayName).toBe('John Smith');
+  });
+
+  it('captures sustained dates per calling and pairs them correctly', () => {
+    const out = parseLcrRoster(
+      tsv(
+        'Doe, Jane\t1985\tAsheville Ward\t\t\t\t' +
+          'Elders Quorum First Counselor (1 Jan 2024) Bishop (5 Mar 2026)\t',
+      ),
+    );
+    expect(out.rows[0].callings).toEqual([
+      'Elders Quorum First Counselor',
+      'Bishop',
+    ]);
+    expect(out.rows[0].sustainedAt).toEqual({
+      'Elders Quorum First Counselor': '2024-01-01',
+      Bishop: '2026-03-05',
+    });
+  });
+
+  it('skips out-of-scope rows and tallies them', () => {
+    const out = parseLcrRoster(
+      tsv(
+        'Doe, Jane\t1985\tAsheville Ward\t\t\t\tSeminary Teacher (1 Jan 2024)\t',
+        'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop (5 Mar 2026)\t',
+      ),
+    );
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].fullName).toBe('John Smith');
+    expect(out.skippedOutOfScope).toBe(1);
+  });
+
+  it('reports missing Birth Year', () => {
+    const out = parseLcrRoster(
+      tsv('Doe, Jane\t\tAsheville Ward\t\t\t\tBishop\t'),
+    );
+    expect(out.rows).toHaveLength(0);
+    expect(out.errors[0].message).toMatch(/birth year/i);
   });
 
   it('rejects a row whose unit is not in the stake vocabulary', () => {
     const out = parseLcrRoster(
-      tsv('Smith, John\tSome Faraway Ward\tBishop\t\t123456789\t\t'),
+      tsv('Smith, John\t1970\tSome Faraway Ward\t\t\t\tBishop\t'),
     );
     expect(out.rows).toHaveLength(0);
     expect(out.errors[0].message).toMatch(/unknown unit/i);
   });
 
-  it('drops rows with no in-scope calling and tallies them', () => {
+  it('rejects a paste missing required columns', () => {
     const out = parseLcrRoster(
-      tsv(
-        'Doe, Jane\tAsheville Ward\tSeminary Teacher Primary Teacher\t\t111111111\t\t',
-        'Smith, John\tAsheville Ward\tBishop\t\t222222222\t\t',
-      ),
-    );
-    expect(out.rows).toHaveLength(1);
-    expect(out.rows[0].name).toBe('John Smith');
-    expect(out.skippedOutOfScope).toBe(1);
-  });
-
-  it('reports missing MRN', () => {
-    const out = parseLcrRoster(tsv('Doe, Jane\tAsheville Ward\tBishop\t\t\t\t'));
-    expect(out.rows).toHaveLength(0);
-    expect(out.errors[0].message).toMatch(/membership number/i);
-  });
-
-  it('rejects a paste that has no MRN column at all', () => {
-    const out = parseLcrRoster(
-      'Preferred Name\tUnit\tCallings\nDoe, Jane\tAsheville Ward\tBishop',
+      'Full Name\tCallings\nDoe, Jane\tBishop',
     );
     expect(out.rows).toHaveLength(0);
     expect(out.errors[0].message).toMatch(/Missing required column/);
   });
 
+  it('detects duplicate ids within a single paste', () => {
+    const out = parseLcrRoster(
+      tsv(
+        'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop\t',
+        'Smith, John\t1970\tAsheville Ward\t\t\t\tElders Quorum President\t',
+      ),
+    );
+    expect(out.rows).toHaveLength(1);
+    expect(out.errors[0].message).toMatch(/duplicate/i);
+  });
+
   it('ignores the trailing "Count:" line', () => {
     const out = parseLcrRoster(
-      tsv('Smith, John\tAsheville Ward\tBishop\t\t123\t\t', 'Count: 155\t\t\t\t\t\t'),
+      tsv(
+        'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop\t',
+        'Count: 155\t\t\t\t\t\t\t',
+      ),
     );
     expect(out.rows).toHaveLength(1);
     expect(out.errors).toEqual([]);
   });
 
-  it('normalizes MRN by stripping non-digits', () => {
-    const out = parseLcrRoster(tsv('Smith, John\tAsheville Ward\tBishop\t\t123-45-6789\t\t'));
-    expect(out.rows[0].mrn).toBe('123456789');
+  it('drops accents in slugs so accented names still produce ASCII ids', () => {
+    const out = parseLcrRoster(
+      tsv('García, María\t1990\tAsheville Ward\t\t\t\tBishop\t'),
+    );
+    expect(out.rows[0].id).toBe('maria-garcia-1990');
+  });
+
+  it('accepts plain Callings column with no sustained dates', () => {
+    // Simulate an LCR export using the plain Callings variant instead of
+    // Callings with Date Sustained - no parentheses in the cell.
+    const header =
+      'Full Name\tBirth Year\tUnit\tPreferred Name\tIndividual E-mail\tIndividual Phone\tCallings';
+    const raw =
+      header +
+      '\n' +
+      'Smith, John\t1970\tAsheville Ward\tJohn\tjohn@example.com\t555-0000\tBishop';
+    const out = parseLcrRoster(raw);
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].callings).toEqual(['Bishop']);
+    expect(out.rows[0].sustainedAt).toEqual({});
   });
 });
 

@@ -315,11 +315,23 @@ deploying to a user/org root page or a custom domain, edit the
   Interview assignment captures the presidency member responsible for
   extending the calling; the workflow cannot advance past
   `interview_assigned` without one.
-- **LCR roster import**: [lcr-parser.ts](src/app/core/lcr-parser.ts) is
-  a deliberately forgiving best-effort parser for pasted LCR member-list
-  text. It never connects to LCR, and only extracts name/unit/email/phone,
-  discarding membership record numbers, birthdates, ordinance dates,
-  and any other sensitive fields that may appear in a full export.
+- **LCR roster import**: [lcr-parser.ts](src/app/core/lcr-parser.ts)
+  reads a pasted LCR *Callings custom report* export. It never connects
+  to LCR - it only parses text you've already copied. The custom
+  report must include: **Full Name**, **Birth Year**, **Unit**,
+  **Callings** (or **Callings with Date Sustained** to also capture
+  time-in-calling). Optional but recommended: **Preferred Name**
+  (used for display; falls back to Full Name), **Individual E-mail**,
+  **Individual Phone**. Everything else the LCR custom-report builder
+  offers - full birthdate, address, ordinance dates, marriage/sealing
+  status, temple recommend fields, etc. - is deliberately not
+  requested, so this data category never leaves LCR through this
+  paste. Person records are keyed by a slug of `Full Name + Birth Year`
+  (e.g. `john-andrew-smith-1970`); re-importing the same person
+  updates the same doc. Membership Record Numbers would be the truly-
+  stable identity but aren't reliably exposed in LCR's copy-paste
+  flow - see the JSDoc on `Person` in `models/types.ts` for the
+  trade-offs.
 - **Deferred out of scope**: temple recommend and leader interview
   scheduling, availability windows, public booking, and calendar
   integration have been intentionally removed from the initial

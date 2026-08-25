@@ -18,11 +18,13 @@ import { PeopleService } from '../../core/people.service';
         kept; other rows are counted and skipped.
       </p>
       <p class="muted text-sm">
-        Your LCR custom report must include these columns:
-        <strong>Preferred Name</strong>, <strong>Unit</strong>, <strong>Callings</strong>,
-        <strong>Membership Number</strong>. E-mail and phone are optional but recommended.
-        The MRN is used as the stable identity key, so re-importing updates the same records
-        rather than creating duplicates.
+        Your LCR custom report must include: <strong>Full Name</strong>,
+        <strong>Birth Year</strong>, <strong>Unit</strong>, <strong>Callings</strong> (or
+        <strong>Callings with Date Sustained</strong> to also capture time-in-calling).
+        <strong>Preferred Name</strong> is used for display if present (falls back to Full Name).
+        <strong>Individual E-mail</strong> and <strong>Individual Phone</strong> are optional.
+        Person records are keyed by Full Name + Birth Year, so re-importing updates the same
+        records rather than creating duplicates.
       </p>
 
       <div class="field">
@@ -64,27 +66,40 @@ import { PeopleService } from '../../core/people.service';
               <thead>
                 <tr>
                   <th></th>
-                  <th>MRN</th>
                   <th>Name</th>
+                  <th>Born</th>
                   <th>Unit</th>
                   <th>In-scope callings</th>
                   <th>Email</th>
                 </tr>
               </thead>
               <tbody>
-                @for (row of result.rows; track row.mrn) {
+                @for (row of result.rows; track row.id) {
                   <tr>
                     <td>
                       <input
                         type="checkbox"
-                        [checked]="selected().has(row.mrn)"
-                        (change)="toggle(row.mrn)"
+                        [checked]="selected().has(row.id)"
+                        (change)="toggle(row.id)"
                       />
                     </td>
-                    <td class="muted text-sm">{{ row.mrn }}</td>
-                    <td>{{ row.name }}</td>
+                    <td>
+                      <div>{{ row.displayName }}</div>
+                      @if (row.displayName !== row.fullName) {
+                        <div class="muted text-sm">{{ row.fullName }}</div>
+                      }
+                    </td>
+                    <td class="muted text-sm">{{ row.birthYear }}</td>
                     <td>{{ row.unitName }}</td>
-                    <td class="text-sm">{{ row.callings.join(' · ') }}</td>
+                    <td class="text-sm">
+                      @for (c of row.callings; track c; let last = $last) {
+                        <span>{{ c }}</span>
+                        @if (row.sustainedAt[c]) {
+                          <span class="muted"> ({{ row.sustainedAt[c] }})</span>
+                        }
+                        @if (!last) { <span> · </span> }
+                      }
+                    </td>
                     <td class="muted text-sm">{{ row.email ?? '—' }}</td>
                   </tr>
                 }
@@ -118,14 +133,14 @@ export class RosterImportComponent {
     const result = parseLcrRoster(this.raw());
     this.parseResult.set(result);
     // Default: all in-scope rows selected.
-    this.selected.set(new Set(result.rows.map((r) => r.mrn)));
+    this.selected.set(new Set(result.rows.map((r) => r.id)));
   }
 
-  toggle(mrn: string): void {
+  toggle(id: string): void {
     this.selected.update((prev) => {
       const next = new Set(prev);
-      if (next.has(mrn)) next.delete(mrn);
-      else next.add(mrn);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -135,15 +150,18 @@ export class RosterImportComponent {
     if (!result) return;
     this.saving.set(true);
     try {
-      const chosen = result.rows.filter((r) => this.selected().has(r.mrn));
+      const chosen = result.rows.filter((r) => this.selected().has(r.id));
       for (const r of chosen) {
-        await this.peopleService.upsertByMrn({
-          mrn: r.mrn,
-          name: r.name,
+        await this.peopleService.upsertPerson({
+          id: r.id,
+          name: r.displayName,
+          fullName: r.fullName,
+          birthYear: r.birthYear,
           unit: r.unit,
           email: r.email,
           phone: r.phone,
           callings: r.callings,
+          sustainedAt: Object.keys(r.sustainedAt).length ? r.sustainedAt : undefined,
         });
       }
       void this.router.navigateByUrl('/people');

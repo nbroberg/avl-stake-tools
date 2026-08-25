@@ -30,19 +30,42 @@ export interface AppUser {
 }
 
 /**
- * people/{mrn} - minimal local record, NOT a membership record mirror.
+ * people/{slug} - minimal local record, NOT a membership record mirror.
  *
- * The Firestore document ID is the person's membership record number
- * (MRN) rather than a random id, because MRN is the only stable
- * identity across name changes (marriage, spelling corrections) and
- * ward reorganizations. Only the number itself is stored - not any of
- * the other membership data (birthdate, ordinances, priesthood office
- * history) that a full LCR export would carry.
+ * The Firestore document id is a slug derived from Full Name + Birth
+ * Year (e.g., `john-andrew-smith-1970`). Church-issued MRN would
+ * be the truly-stable identity, but LCR's copy-paste flow doesn't
+ * expose MRN reliably; Full Name changes rarely (marriage/legal
+ * change), Birth Year never, so together they are stable enough for
+ * a stake's population where same-name-same-year collisions are
+ * astronomically unlikely.
+ *
+ * Only the four narrow fields (name/unit/email/phone) plus a
+ * lightweight `birthYear` (integer, no day/month) and the extracted
+ * in-scope callings ever land here - not any of the sensitive
+ * membership data (full birthdate, ordinances, priesthood office
+ * history, marriage/sealing status, etc.) that an unfiltered LCR
+ * export would carry.
  */
 export interface Person {
-  /** The MRN - same as the document ID. */
+  /** Slug from Full Name + Birth Year - same as the document id. */
   id: string;
+  /**
+   * Display name. Comes from LCR's Preferred Name (falls back to
+   * Full Name if Preferred Name isn't set). Changes freely - purely
+   * cosmetic, never used for identity.
+   */
   name: string;
+  /**
+   * Full legal name from LCR, normalized to "First Last" order.
+   * Used together with birthYear to derive the doc id `id`; keep
+   * both fields on the doc so a later reconciliation (e.g., after
+   * a name change) can match by original identity source without
+   * re-parsing the slug.
+   */
+  fullName: string;
+  /** Year only (integer). Day/month is deliberately not stored. */
+  birthYear: number;
   /**
    * Church-issued unit number (stored as a string id, not the display
    * name). See core/units.ts for the vocabulary and unitLabel() to
@@ -58,6 +81,15 @@ export interface Person {
    * never land here.
    */
   callings?: string[];
+  /**
+   * When each of the above callings was sustained, as an ISO date
+   * string (YYYY-MM-DD). Populated when the LCR export includes the
+   * "Callings with Date Sustained" variant. Missing entries mean LCR
+   * didn't supply the date for that role; callings not in this map
+   * still show up in `callings` and render on /scope without a
+   * time-in-calling display.
+   */
+  sustainedAt?: Record<string, string>;
   active: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
