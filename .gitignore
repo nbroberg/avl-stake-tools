@@ -1,0 +1,12 @@
+node_modules
+dist
+.env.local
+*.local
+.DS_Store
+npm-debug.log*
+coverage
+.firebase
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+.angular

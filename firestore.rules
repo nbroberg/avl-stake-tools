@@ -1,0 +1,152 @@
+rules_version = '2';
+
+// -----------------------------------------------------------------------
+// Stake Presidency Tools - Firestore Security Rules
+//
+// Authorization model: Firebase Authentication only proves WHO someone is.
+// Whether they may use the app is decided here, by looking up their own
+// users/{uid} document. An authenticated Google account with no active
+// users/{uid} record (or active == false) is treated as unauthorized for
+// every collection except its own user doc.
+//
+// Roles: stake_presidency, high_council.
+//
+// Rule of thumb for HC vs presidency:
+// - Presidency owns everything: create/read/update on people and
+//   callingWorkflows, and every calling-status transition.
+// - High council reads everything, and may only advance callingWorkflows
+//   from `presidency_approved` to `high_council_approved`. No other
+//   writes.
+//
+// Users cannot elevate themselves - the users collection is not writable
+// from the app; the first admin adds subsequent user docs via the
+// Firebase Console.
+// -----------------------------------------------------------------------
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function callerDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveUser() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && callerDoc().data.active == true;
+    }
+
+    function hasRole(role) {
+      return isActiveUser() && callerDoc().data.role == role;
+    }
+
+    function isPresidency() {
+      return hasRole('stake_presidency');
+    }
+
+    function isHighCouncil() {
+      return hasRole('high_council');
+    }
+
+    function isAnyApprovedUser() {
+      return isPresidency() || isHighCouncil();
+    }
+
+    // ---------------------------------------------------------------------
+    // users - the application's own authorization table.
+    //
+    // Never writable from the app. New users, role changes, and
+    // deactivations are done directly in the Firebase Console, so the app
+    // cannot self-elevate no matter what bug or compromise happens
+    // client-side. A caller can read only their own doc, so no one can
+    // enumerate the presidency/HC roster from the client.
+    // ---------------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // people - minimal local roster records (name/unit/email/phone only).
+    // Both roles read; only presidency creates/updates. Delete is
+    // presidency-only too (there's no admin role in the POC).
+    // ---------------------------------------------------------------------
+    match /people/{personId} {
+      allow read: if isAnyApprovedUser();
+      allow create, update, delete: if isPresidency();
+    }
+
+    // ---------------------------------------------------------------------
+    // callingWorkflows - lifecycle tracking + audit history subcollection.
+    // History is append-only: no update/delete once written.
+    // ---------------------------------------------------------------------
+    match /callingWorkflows/{workflowId} {
+      allow read: if isAnyApprovedUser();
+      allow create: if isPresidency();
+      allow delete: if isPresidency();
+
+      // Presidency can update anything. High Council can do two things
+      // and nothing else: cast their own approval vote on a workflow
+      // sitting at `presidency_approved`, and advance the status once
+      // enough of them have voted.
+      allow update: if isPresidency()
+        || (isHighCouncil()
+            && (isHighCouncilVote() || isHighCouncilQuorumAdvance()));
+
+      match /history/{entryId} {
+        allow read: if isAnyApprovedUser();
+        // Anyone who can advance the parent workflow can write the
+        // matching history entry. HC members also write a history entry
+        // when they cast a vote (they only touch history + the vote
+        // array on the parent).
+        allow create: if isPresidency() || isHighCouncil();
+        allow update, delete: if false;
+      }
+    }
+
+    /**
+     * A High Council member adding exactly their own UID to the
+     * approval array, one entry at a time, on a workflow currently at
+     * `presidency_approved`. Nothing else may change beyond the audit
+     * fields. Prevents an HC member from voting twice, voting on
+     * someone else's behalf, or touching status/notes/anything else.
+     */
+    function isHighCouncilVote() {
+      return resource.data.status == 'presidency_approved'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['hcApprovalUids', 'updatedAt', 'updatedBy'])
+        && request.resource.data.hcApprovalUids.hasAll(resource.data.hcApprovalUids)
+        && request.resource.data.hcApprovalUids.size() == resource.data.hcApprovalUids.size() + 1
+        && request.resource.data.hcApprovalUids.hasAll([request.auth.uid])
+        && !(resource.data.hcApprovalUids.hasAll([request.auth.uid]));
+    }
+
+    /**
+     * Advancing from `presidency_approved` to `high_council_approved`
+     * once the workflow has collected enough HC approvals to meet its
+     * own snapshotted quorum threshold. Presidency has a separate
+     * unconditional path via `isPresidency()`; this rule is what lets
+     * an HC member click the advance button once quorum is met.
+     */
+    function isHighCouncilQuorumAdvance() {
+      return resource.data.status == 'presidency_approved'
+        && request.resource.data.status == 'high_council_approved'
+        && resource.data.hcApprovalUids.size() >= resource.data.hcRequired
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'updatedAt', 'updatedBy', 'highCouncilApprovedDate']);
+    }
+
+    // ---------------------------------------------------------------------
+    // diagnostics - lightweight per-user connectivity ping, no app data.
+    // Any authenticated user may use this, even before being approved, so
+    // connectivity from a meetinghouse network can be verified before role
+    // assignment.
+    // ---------------------------------------------------------------------
+    match /diagnostics/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+  }
+}

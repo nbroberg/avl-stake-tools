@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "callingWorkflows",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "unit", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

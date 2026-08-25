@@ -1,0 +1,42 @@
+{
+  "name": "avl-stake-tools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stake Presidency App POC - callings/sustainings, roster import, interview scheduling (Angular).",
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || ^26.0.0"
+  },
+  "scripts": {
+    "prestart": "node scripts/generate-environment.mjs",
+    "start": "ng serve",
+    "prebuild": "node scripts/generate-environment.mjs",
+    "build": "ng build",
+    "type-check": "tsc -p tsconfig.app.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@angular/common": "^22.0.0",
+    "@angular/compiler": "^22.0.0",
+    "@angular/core": "^22.0.0",
+    "@angular/forms": "^22.0.0",
+    "@angular/platform-browser": "^22.0.0",
+    "@angular/router": "^22.0.0",
+    "firebase": "^12.18.0",
+    "rxjs": "^7.8.1",
+    "tslib": "^2.6.3"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.0.0",
+    "@angular/cli": "^22.0.0",
+    "@angular/compiler-cli": "^22.0.0",
+    "@eslint/js": "^10.0.0",
+    "angular-eslint": "^22.1.0",
+    "eslint": "^10.6.0",
+    "globals": "^16.0.0",
+    "typescript": "~6.0.0",
+    "typescript-eslint": "^8.62.0",
+    "vitest": "^4.1.0"
+  }
+}
