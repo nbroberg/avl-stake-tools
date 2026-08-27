@@ -281,10 +281,15 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         grid-template-columns: auto 1fr;
         align-items: start;
         gap: 0.7rem;
-        padding: 0.6rem 0.75rem;
+        padding: 0.85rem 0.75rem;
         /* The whole row is the tap target for the radio inside it. */
         min-height: var(--tap);
-        border-top: 1px solid var(--border);
+        /* var(--border) reads as barely-there hairline against a white
+           surface, especially outdoors on a phone - with two- and
+           three-line rows (multi-calling holders wrap to 2 lines) that
+           made adjacent rows visually run together. A stronger, text-based
+           divider stays legible at any brightness. */
+        border-top: 1px solid rgba(26, 39, 51, 0.14);
         cursor: pointer;
         touch-action: manipulation;
         transition: background-color 120ms ease;
@@ -302,16 +307,18 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
       .candidate-body {
         display: flex;
         flex-direction: column;
-        gap: 0.15rem;
+        gap: 0.3rem;
         min-width: 0;
       }
       .candidate-name {
         font-weight: 500;
         color: var(--text);
+        line-height: 1.3;
       }
       .candidate-callings {
         font-size: 0.85rem;
         color: var(--text);
+        line-height: 1.4;
       }
       .candidate-callings.muted { color: var(--muted); font-style: italic; }
       .candidate-callings .sep { color: var(--muted); }
@@ -346,6 +353,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
       .candidate-meta {
         font-size: 0.75rem;
         color: var(--muted);
+        line-height: 1.3;
       }
     `,
   ],
