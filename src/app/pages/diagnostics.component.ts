@@ -1,4 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db, firebaseConfigIsPresent } from '../core/firebase';
 import { AuthService } from '../core/auth.service';
@@ -55,8 +56,28 @@ const RESULT_STYLE: Record<CheckResult, { label: string; bg: string; fg: string 
 @Component({
   selector: 'app-diagnostics',
   standalone: true,
+  imports: [RouterLink],
+  styles: [
+    `
+      .diagnostics {
+        /* No app header above this route, so clear the status bar directly. */
+        padding-top: max(1rem, env(safe-area-inset-top));
+      }
+      .back {
+        display: inline-flex;
+        align-items: center;
+        min-height: var(--tap);
+        font-weight: 600;
+        text-decoration: none;
+      }
+    `,
+  ],
   template: `
-    <div class="page stack">
+    <div class="page diagnostics stack">
+      <!-- This route sits outside the app shell (it must work signed out), so
+           it carries its own way back rather than stranding a phone user with
+           no nav bar. -->
+      <a class="back" routerLink="/">&larr; Back to app</a>
       <h1>Diagnostics</h1>
       <p class="muted text-sm">
         Use this page from the meetinghouse network to confirm the app can reach Firebase
@@ -75,7 +96,7 @@ const RESULT_STYLE: Record<CheckResult, { label: string; bg: string; fg: string 
         }
       </div>
 
-      <button class="btn btn-primary" (click)="runChecks()" [disabled]="running()">
+      <button class="btn btn-primary btn-responsive" (click)="runChecks()" [disabled]="running()">
         {{ running() ? 'Running checks…' : 'Run connectivity checks' }}
       </button>
 

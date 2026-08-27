@@ -112,7 +112,10 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
 
       <input
         type="search"
+        aria-label="Filter people by name"
         placeholder="Filter by name…"
+        autocapitalize="none"
+        autocomplete="off"
         [ngModel]="filter()"
         (ngModelChange)="filter.set($event)"
       />
@@ -269,6 +272,22 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
         display: flex;
         gap: 1.25rem;
         align-items: baseline;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 639.98px) {
+        .totals {
+          width: 100%;
+          gap: 0.5rem;
+        }
+        .total {
+          flex: 1 1 0;
+          align-items: center;
+          padding: 0.4rem 0.25rem;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          background: var(--surface);
+        }
+        .total .num { font-size: 1.35rem; }
       }
       .total {
         display: flex;
@@ -299,12 +318,20 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
         display: flex;
         flex-direction: column;
       }
+      /* Phones stack the slot label above the name. A 12rem label column would
+         leave roughly 100px for the person on a 360px screen. */
       dl.slots .slot {
         display: grid;
-        grid-template-columns: 12rem 1fr;
-        gap: 1rem;
+        grid-template-columns: 1fr;
+        gap: 0.1rem;
         padding: 0.5rem 0;
         border-top: 1px solid var(--border);
+      }
+      @media (min-width: 640px) {
+        dl.slots .slot {
+          grid-template-columns: 12rem 1fr;
+          gap: 1rem;
+        }
       }
       dl.slots .slot:first-child { border-top: none; }
       dl.slots dt {
@@ -334,6 +361,7 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
         letter-spacing: 0.01em;
       }
       .p-mini {
+        position: relative;
         display: inline-flex;
         width: 1.4rem;
         height: 1.4rem;
@@ -344,7 +372,17 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
         text-decoration: none;
         font-size: 0.85rem;
       }
-      .p-mini:hover { background: var(--bg); color: var(--primary); }
+      /* A 1.4rem icon is a fine pointer target and a poor finger one. Grow the
+         hit area to ~42px with a transparent overlay rather than the box
+         itself, which would otherwise wrap onto its own line beside a name. */
+      .p-mini::after {
+        content: '';
+        position: absolute;
+        inset: -0.7rem;
+      }
+      @media (hover: hover) {
+        .p-mini:hover { background: var(--bg); color: var(--primary); }
+      }
       .gap {
         color: var(--warn);
         font-weight: 600;
@@ -382,7 +420,9 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
         color: var(--text);
         margin-bottom: 0.25rem;
       }
-      .aux dl.slots .slot { grid-template-columns: 7rem 1fr; }
+      @media (min-width: 640px) {
+        .aux dl.slots .slot { grid-template-columns: 7rem 1fr; }
+      }
 
       .unit-card { padding-bottom: 1.25rem; }
       .unit-header {
@@ -414,6 +454,8 @@ const AUX_ROLE_SUFFIXES: Array<{ label: string; suffix: string }> = [
       }
       .text-sm { font-size: 0.85rem; }
       input[type='search'] {
+        width: 100%;
+        min-height: var(--tap);
         padding: 0.6rem 0.7rem;
         border-radius: 8px;
         border: 1px solid var(--border);

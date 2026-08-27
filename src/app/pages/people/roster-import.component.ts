@@ -37,7 +37,9 @@ import { PeopleService } from '../../core/people.service';
         ></textarea>
       </div>
 
-      <button class="btn" (click)="doParse()" [disabled]="!raw().trim()">Parse</button>
+      <button class="btn btn-responsive" (click)="doParse()" [disabled]="!raw().trim()">
+        Parse
+      </button>
 
       @if (parseResult(); as result) {
         @if (result.errors.length > 0) {
@@ -69,61 +71,71 @@ import { PeopleService } from '../../core/people.service';
                 can flag mismatches (e.g. calling an Elder to be Bishop).
               </p>
             }
-            <table>
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>Name</th>
-                  <th>Born</th>
-                  <th>Unit</th>
-                  <th>Office</th>
-                  <th>In-scope callings</th>
-                  <th>Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of result.rows; track row.id) {
+            <!-- Seven columns never fit a phone: the stacked class breaks each
+                 row into its own labelled card below 640px, and table-wrap lets
+                 the table scroll on its own above that instead of the page. -->
+            <div class="table-wrap">
+              <table class="stacked">
+                <thead>
                   <tr>
-                    <td>
-                      <input
-                        type="checkbox"
-                        [checked]="selected().has(row.id)"
-                        (change)="toggle(row.id)"
-                      />
-                    </td>
-                    <td>
-                      <div>{{ row.displayName }}</div>
-                      @if (row.displayName !== row.fullName) {
-                        <div class="muted text-sm">{{ row.fullName }}</div>
-                      }
-                    </td>
-                    <td class="muted text-sm">{{ row.birthYear }}</td>
-                    <td>{{ row.unitName }}</td>
-                    <td class="muted text-sm">
-                      @if (row.priesthoodOffice === undefined) {
-                        <span>—</span>
-                      } @else if (row.priesthoodOffice === '') {
-                        <span>(none)</span>
-                      } @else {
-                        <span>{{ row.priesthoodOffice }}</span>
-                      }
-                    </td>
-                    <td class="text-sm">
-                      @for (c of row.callings; track c; let last = $last) {
-                        <span>{{ c }}</span>
-                        @if (row.sustainedAt[c]) {
-                          <span class="muted"> ({{ row.sustainedAt[c] }})</span>
-                        }
-                        @if (!last) { <span> · </span> }
-                      }
-                    </td>
-                    <td class="muted text-sm">{{ row.email ?? '—' }}</td>
+                    <th><span class="sr-only">Include</span></th>
+                    <th>Name</th>
+                    <th>Born</th>
+                    <th>Unit</th>
+                    <th>Office</th>
+                    <th>In-scope callings</th>
+                    <th>Email</th>
                   </tr>
-                }
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  @for (row of result.rows; track row.id) {
+                    <tr>
+                      <td class="pick-cell">
+                        <!-- The label wraps the checkbox so the person's name is
+                             part of the tap target, not just the 20px box. -->
+                        <label class="pick">
+                          <input
+                            type="checkbox"
+                            [checked]="selected().has(row.id)"
+                            (change)="toggle(row.id)"
+                          />
+                          <span class="pick-text">Include in import</span>
+                        </label>
+                      </td>
+                      <td data-label="Name">
+                        <div>{{ row.displayName }}</div>
+                        @if (row.displayName !== row.fullName) {
+                          <div class="muted text-sm">{{ row.fullName }}</div>
+                        }
+                      </td>
+                      <td data-label="Born" class="muted text-sm">{{ row.birthYear }}</td>
+                      <td data-label="Unit">{{ row.unitName }}</td>
+                      <td data-label="Office" class="muted text-sm">
+                        @if (row.priesthoodOffice === undefined) {
+                          <span>—</span>
+                        } @else if (row.priesthoodOffice === '') {
+                          <span>(none)</span>
+                        } @else {
+                          <span>{{ row.priesthoodOffice }}</span>
+                        }
+                      </td>
+                      <td data-label="Callings" class="text-sm">
+                        @for (c of row.callings; track c; let last = $last) {
+                          <span>{{ c }}</span>
+                          @if (row.sustainedAt[c]) {
+                            <span class="muted"> ({{ row.sustainedAt[c] }})</span>
+                          }
+                          @if (!last) { <span> · </span> }
+                        }
+                      </td>
+                      <td data-label="Email" class="muted text-sm">{{ row.email ?? '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
             <button
-              class="btn btn-primary"
+              class="btn btn-primary btn-responsive"
               [disabled]="saving() || selectedCount() === 0"
               (click)="doImport()"
             >
@@ -134,6 +146,41 @@ import { PeopleService } from '../../core/people.service';
       }
     </div>
   `,
+  styles: [
+    `
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      .pick {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        /* Vertical padding brings the row's tap target up to ~44px. */
+        padding: 0.35rem 0;
+        min-height: var(--tap);
+        cursor: pointer;
+      }
+      /* On wide screens the checkbox is a bare column - the name is already in
+         the next cell, so the repeated label would be noise. */
+      .pick-text { display: none; }
+      @media (max-width: 639.98px) {
+        .pick-cell {
+          border-bottom: 1px solid var(--border);
+          margin-bottom: 0.35rem;
+        }
+        .pick { min-height: 0; }
+        .pick-text { display: inline; font-size: 0.9rem; font-weight: 600; }
+        /* The stacked layout right-aligns cell values; this cell is a control,
+           so keep it reading left-to-right. */
+        .pick-cell > * { text-align: left; }
+      }
+    `,
+  ],
 })
 export class RosterImportComponent {
   private readonly peopleService = inject(PeopleService);
