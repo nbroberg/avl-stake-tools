@@ -23,7 +23,12 @@ export interface StakeUnit {
   kind: UnitKind;
 }
 
-export const STAKE_UNITS: StakeUnit[] = [
+/**
+ * The stake's real units. Demo mode replaces this whole vocabulary with
+ * invented units via overrideStakeUnits(), so read the active list through
+ * stakeUnits() rather than importing this constant.
+ */
+const REAL_STAKE_UNITS: readonly StakeUnit[] = [
   { number: '139173',  name: 'Asheville Ward',                          kind: 'ward'   },
   { number: '49212',   name: 'Cherokee Ward',                           kind: 'ward'   },
   { number: '49921',   name: 'Forest City Ward',                        kind: 'ward'   },
@@ -37,19 +42,41 @@ export const STAKE_UNITS: StakeUnit[] = [
   { number: '1906070', name: 'Hendersonville 2nd Branch (Pohnpeian)',   kind: 'branch' },
 ];
 
-const BY_NUMBER = new Map(STAKE_UNITS.map((u) => [u.number, u]));
-const BY_NAME_LOWER = new Map(STAKE_UNITS.map((u) => [u.name.toLowerCase(), u]));
+let activeUnits: readonly StakeUnit[] = REAL_STAKE_UNITS;
+let byNumber = new Map(activeUnits.map((u) => [u.number, u]));
+let byNameLower = new Map(activeUnits.map((u) => [u.name.toLowerCase(), u]));
+
+/** The active unit vocabulary - the real stake's, or demo mode's. */
+export function stakeUnits(): readonly StakeUnit[] {
+  return activeUnits;
+}
+
+/**
+ * Swap the unit vocabulary. Demo mode uses this to replace the real
+ * wards and branches with invented ones, so a demo session never puts
+ * this stake's actual unit names on screen.
+ *
+ * Called once from the demo chunk before the app bootstraps (see
+ * core/demo/demo-providers.ts); nothing else should touch it. The
+ * lookup maps are rebuilt here because every function below reads
+ * through them.
+ */
+export function overrideStakeUnits(units: readonly StakeUnit[]): void {
+  activeUnits = units;
+  byNumber = new Map(units.map((u) => [u.number, u]));
+  byNameLower = new Map(units.map((u) => [u.name.toLowerCase(), u]));
+}
 
 /** Lookup by number. Returns undefined for an unknown id. */
 export function unitByNumber(number: string | null | undefined): StakeUnit | undefined {
   if (!number) return undefined;
-  return BY_NUMBER.get(number);
+  return byNumber.get(number);
 }
 
 /** Case-insensitive name lookup, for translating LCR paste rows. */
 export function unitByName(name: string | null | undefined): StakeUnit | undefined {
   if (!name) return undefined;
-  return BY_NAME_LOWER.get(name.trim().toLowerCase());
+  return byNameLower.get(name.trim().toLowerCase());
 }
 
 /**
@@ -59,7 +86,7 @@ export function unitByName(name: string | null | undefined): StakeUnit | undefin
  */
 export function unitLabel(number: string | null | undefined): string {
   if (!number) return '';
-  const u = BY_NUMBER.get(number);
+  const u = byNumber.get(number);
   return u ? u.name : number;
 }
 

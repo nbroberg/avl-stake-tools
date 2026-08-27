@@ -37,6 +37,39 @@ Users cannot elevate themselves — `users/{uid}` is not writable from
 the app under any circumstances. New user records, role changes, and
 deactivations are done directly in the Firebase Console.
 
+## High council review
+
+A calling that needs the high council's approval stops at
+`presidency_approved` until enough councilors respond. Each member acts
+individually — there is no group vote object — and each has three moves:
+
+| Action | Effect |
+| --- | --- |
+| **Approve** | Adds their UID to `hcApprovalUids`. Two-step: the first tap arms a confirmation. |
+| **Withdraw** | Removes it again. Only while the workflow is still at `presidency_approved`; once it advances, votes freeze. |
+| **Raise a concern** | Moves their UID to `hcConcernUids` instead. |
+
+A member holds at most one position at a time — approving clears their
+concern and vice versa — enforced in `firestore.rules`, not just the UI.
+
+**A concern is not a veto.** It doesn't change the approval arithmetic, but
+it does block the *high council's own* advance path, so a concern has to be
+talked through and cleared — or the stake presidency advances the workflow
+themselves, which is recorded in the audit trail. One councilor can slow the
+council down; only the presidency can overrule.
+
+**Quorum** is snapshotted onto each workflow at creation (`hcRequired`) from
+`HC_QUORUM_REQUIRED` in `core/quorum.ts` — currently ceil(12 × 0.7) = 9. A
+stake with a different council size should change `HC_TOTAL` before going
+live, since a 9-of-10 threshold is near-unanimous.
+
+**Who sees what.** Councilors see the tally only (`8 of 9`). The presidency
+additionally sees *who* approved and who raised a concern, resolved from the
+audit trail. Note the asymmetry that isn't there: **"who hasn't voted" is
+deliberately not shown to anyone**, because answering it would mean letting
+clients enumerate the `users` collection, and the rules keep each account
+readable only by its owner. Chasing stragglers stays an out-of-band job.
+
 ## Calling lifecycle
 
 Both `calling` and `release` workflow types share the first two states
@@ -90,9 +123,16 @@ src/
                       pure logic (LCR parsing, calling status machine,
                       role helpers) - kept separate from components so
                       it's independently testable
+    core/hc-review.ts Pure helpers for the high council step (what awaits
+                      me, the tally, resolving voter names) - shared by the
+                      list, dashboard and detail screens
+    core/demo/        Demo mode: in-memory stand-ins for the three
+                      Firestore-backed services, a mock dataset, and an
+                      invented unit vocabulary. Loaded as a lazy chunk,
+                      only when demo mode is active - see "Demo mode" below
     auth/             Login and access-denied pages
     layout/           App shell: header + nav + <router-outlet>
-    shared/           StatusBadgeComponent
+    shared/           StatusBadgeComponent, DemoBannerComponent
     models/           TypeScript interfaces (Person, CallingWorkflow,
                       CallingStatus, AppUser, ...)
     pages/            Routed screens (callings, people, diagnostics,
@@ -273,6 +313,54 @@ firebase emulators:start --only auth,firestore
 
 Java is required for the Firestore emulator. On macOS,
 `brew install openjdk` and put it on PATH.
+
+### 4b. Demo mode (mock data, no Firebase)
+
+Demo mode runs the whole app against an in-memory dataset behind a
+pretend signed-in user. It exists so the authenticated UI can be
+exercised — on a phone, in a review, in a screenshot — without a
+Firebase project, an approved Google account, or any real membership
+data on screen.
+
+```
+npm start
+```
+
+then open **http://localhost:4200/?demo=1**. `?demo=0` leaves it, as
+does the **Exit** button in the banner.
+
+What it covers:
+
+- **Everything above the data layer is the real thing.** Only
+  `AuthService`, `PeopleService` and `CallingsService` are swapped, for
+  in-memory equivalents that mirror their write semantics. The route
+  guard, the Handbook authorities rules, the status machine, the LCR
+  parser and every component run unmodified.
+- **Writes work and stick until reload.** Create a workflow, advance it,
+  record high council approvals, edit notes, paste and import a roster.
+- **A role switch in the banner** flips the pretend user between Stake
+  Presidency and High Council, which is the only way to exercise both
+  permission paths without two real accounts.
+- **The seed data is shaped to hit the edges**: vacant slots so the Scope
+  report renders its gap markers, a workflow parked at each interesting
+  status, one two short of high council quorum, and one whose priesthood
+  office deliberately mismatches the calling.
+
+**Nothing on screen is real.** Every name, birth year, email and phone in
+`core/demo/demo-data.ts` is invented; emails use the reserved
+`example.com` domain and phones the reserved `555-01xx` range. The wards
+and branches are invented too — `core/demo/demo-units.ts` replaces the
+stake's real unit vocabulary for the whole session via
+`overrideStakeUnits()`, so a demo never names an actual unit. The
+importer, the Scope report and the New Calling dropdown all read the
+active vocabulary, so they validate against the fake units exactly as
+they would against the real ones.
+
+**Availability is gated.** Demo mode is always available in a dev build.
+A production build only offers it when `ENABLE_DEMO_MODE=true` was set at
+build time, so a normal deploy cannot be talked into showing fake data by
+anyone who guesses the URL. Either way the mock dataset lives in a lazy
+chunk that a normal build never loads.
 
 ### 5. GitHub setup
 
