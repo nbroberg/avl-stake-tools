@@ -284,11 +284,15 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         padding: 0.85rem 0.75rem;
         /* The whole row is the tap target for the radio inside it. */
         min-height: var(--tap);
-        /* var(--border) reads as barely-there hairline against a white
-           surface, especially outdoors on a phone - with two- and
-           three-line rows (multi-calling holders wrap to 2 lines) that
-           made adjacent rows visually run together. A stronger, text-based
-           divider stays legible at any brightness. */
+        /* .candidate-list is a flex column with a capped max-height and
+           overflow-y: auto for scrolling. Without flex-shrink: 0, once
+           the rows' combined natural height exceeds that cap, flexbox
+           shrinks every row toward its min-height *before* falling back
+           to scroll - so every row got clamped to exactly var(--tap) and
+           its text (candidate-body, overflow: visible) spilled silently
+           into the row below. This keeps rows at their content height and
+           lets the list scroll instead. */
+        flex-shrink: 0;
         border-top: 1px solid rgba(26, 39, 51, 0.14);
         cursor: pointer;
         touch-action: manipulation;
