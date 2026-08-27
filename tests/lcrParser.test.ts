@@ -58,9 +58,10 @@ describe('parseLcrRoster', () => {
   });
 
   it('skips out-of-scope rows and tallies them', () => {
+    // Primary Teacher is a ward-auxiliary calling; nothing stake-touchable.
     const out = parseLcrRoster(
       tsv(
-        'Doe, Jane\t1985\tAsheville Ward\t\t\t\tSeminary Teacher (1 Jan 2024)\t',
+        'Doe, Jane\t1985\tAsheville Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
         'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop (5 Mar 2026)\t',
       ),
     );
@@ -154,18 +155,28 @@ describe('extractInScopeCallings', () => {
 
   it('distinguishes Stake President from Stake Presidency', () => {
     expect(extractInScopeCallings('Stake President')).toEqual(['Stake President']);
-    expect(extractInScopeCallings('Stake Presidency First Counselor Audit Committee Chairman')).toEqual([
-      'Stake Presidency First Counselor',
-    ]);
+    // Stake Presidency First Counselor and Audit Committee Chairman are both
+    // stake callings now; the point of the test is that "Stake Presidency"
+    // still doesn't collapse into the bare "Stake President" match.
+    expect(
+      extractInScopeCallings('Stake Presidency First Counselor Audit Committee Chairman'),
+    ).toEqual(['Stake Presidency First Counselor', 'Audit Committee Chairman']);
   });
 
-  it('does not match excluded stake specialties', () => {
+  it('prefers a longer role over a substring role', () => {
+    // "Assistant Communication Director" contains "Communication Director" —
+    // the longer match must win and the shorter one must not double-count.
     expect(
-      extractInScopeCallings('Stake Welfare and Self-Reliance Specialist Stake CS Missionary'),
-    ).toEqual([]);
+      extractInScopeCallings('Assistant Communication Director'),
+    ).toEqual(['Assistant Communication Director']);
   });
 
   it('returns an empty array for out-of-scope callings', () => {
-    expect(extractInScopeCallings('Seminary Teacher Primary Teacher')).toEqual([]);
+    // Primary Teacher, Ward Music Chairman, and Ward Temple and Family
+    // History Consultant are all ward-only callings the stake presidency
+    // never touches.
+    expect(
+      extractInScopeCallings('Primary Teacher Ward Music Chairman'),
+    ).toEqual([]);
   });
 });

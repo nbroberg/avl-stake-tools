@@ -6,7 +6,7 @@ import { CallingsService } from '../../core/callings.service';
 import { PeopleService } from '../../core/people.service';
 import { AuthService } from '../../core/auth.service';
 import {
-  STAKE_ROLES,
+  STAKE_ROLE_GROUPS,
   WARD_BISHOPRIC_ROLES,
   BRANCH_PRESIDENCY_ROLES,
   EQ_ROLES,
@@ -17,11 +17,13 @@ import type { CallingWorkflowType } from '../../models/types';
 
 interface CallingOptionGroup {
   label: string;
-  options: string[];
+  options: readonly string[];
 }
 
 const CALLING_GROUPS: CallingOptionGroup[] = [
-  { label: 'Stake Callings', options: STAKE_ROLES },
+  // Stake callings are LCR-categorized so the dropdown has one optgroup
+  // per stake-org section rather than one 100+-item block.
+  ...STAKE_ROLE_GROUPS.map((g) => ({ label: g.label, options: g.roles })),
   { label: 'Ward Bishopric', options: WARD_BISHOPRIC_ROLES },
   { label: 'Branch Presidency', options: BRANCH_PRESIDENCY_ROLES },
   { label: 'Elders Quorum Presidency', options: EQ_ROLES },

@@ -3,56 +3,227 @@
  * plus the machinery for finding them inside an LCR "Callings" cell (which
  * is a space-joined list of calling names with no delimiters).
  *
- * Three buckets: stake-level callings, ward/branch bishoprics (or branch
- * presidencies), and Elders Quorum presidencies. Everything else - Sunday
- * School teachers, ward music leaders, seminary teachers, activity
- * coordinators - is intentionally out of scope.
+ * Three top-level buckets: stake-level callings (everything shown on the
+ * stake org report in LCR — presidencies, high council, patriarch,
+ * auxiliaries, auditors, communication, seminary/institute, welfare,
+ * custom stake callings, etc.), ward/branch bishoprics, and Elders Quorum
+ * presidencies. The stake bucket is subdivided into the same categories
+ * LCR uses so the New Calling dropdown can present them as optgroups.
  *
- * Pattern list is ordered longest-first per bucket. Match uses word
- * boundaries and rewrites longer patterns' matches with spaces so a
- * shorter pattern doesn't double-count within the same substring:
- * "Bishopric First Counselor" wins over the bare "Bishop", "Stake Sunday
- * School Second Counselor" wins over "Stake Sunday School", etc.
+ * Ward-side callings outside the bishopric (Sunday School teacher, ward
+ * music leader, activity coordinator, etc.) are intentionally out of
+ * scope — those are the bishop's to fill, not the stake presidency's.
  *
- * A short EXCLUDES list blanks out calling names that would otherwise
- * accidentally match a shorter in-scope prefix ("Stake Welfare and
- * Self-Reliance Specialist" starts with "Stake", but is not a stake-
- * calling in the leadership sense).
+ * Match uses word boundaries and iterates patterns longest-first so that
+ * a shorter pattern doesn't double-count within the same substring:
+ * "Bishopric First Counselor" wins over the bare "Bishop", "Assistant
+ * Communication Director" wins over "Communication Director", etc.
  */
 
 export type Bucket = 'stake' | 'bishopric' | 'eq';
 
-export const STAKE_ROLES: string[] = [
-  'Stake Presidency First Counselor',
-  'Stake Presidency Second Counselor',
-  'Stake Executive Secretary',
-  'Stake Assistant Clerk--Finance',
-  'Stake Assistant Clerk--Membership',
-  'Stake Assistant Clerk',
-  'Stake Clerk',
-  'Stake High Councilor',
-  'Patriarch',
-  'Stake Young Women First Counselor',
-  'Stake Young Women Second Counselor',
-  'Stake Young Women Secretary',
-  'Stake Young Women President',
-  'Stake Young Men First Counselor',
-  'Stake Young Men Second Counselor',
-  'Stake Young Men Secretary',
-  'Stake Young Men President',
-  'Stake Primary First Counselor',
-  'Stake Primary Second Counselor',
-  'Stake Primary Secretary',
-  'Stake Primary President',
-  'Stake Relief Society First Counselor',
-  'Stake Relief Society Second Counselor',
-  'Stake Relief Society Secretary',
-  'Stake Relief Society President',
-  'Stake Sunday School First Counselor',
-  'Stake Sunday School Second Counselor',
-  'Stake Sunday School President',
-  'Stake President',
+export interface StakeRoleGroup {
+  /** Label shown as an <optgroup> in the New Calling dropdown. */
+  readonly label: string;
+  readonly roles: readonly string[];
+}
+
+/**
+ * Stake-level callings grouped the same way LCR groups them on the stake
+ * org report. Order within a group is presidency → counselors → secretary
+ * → other; group order roughly follows the LCR page.
+ */
+export const STAKE_ROLE_GROUPS: readonly StakeRoleGroup[] = [
+  {
+    label: 'Stake Presidency & Office',
+    roles: [
+      'Stake President',
+      'Stake Presidency First Counselor',
+      'Stake Presidency Second Counselor',
+      'Stake Executive Secretary',
+      'Stake Assistant Executive Secretary',
+      'Stake Clerk',
+      'Stake Assistant Clerk--Finance',
+      'Stake Assistant Clerk--Membership',
+      'Stake Assistant Clerk',
+    ],
+  },
+  {
+    label: 'High Council & Patriarch',
+    roles: ['Stake High Councilor', 'Patriarch'],
+  },
+  {
+    label: 'Stake Relief Society',
+    roles: [
+      'Stake Relief Society President',
+      'Stake Relief Society First Counselor',
+      'Stake Relief Society Second Counselor',
+      'Stake Relief Society Secretary',
+    ],
+  },
+  {
+    label: 'Stake Young Men',
+    roles: [
+      'Stake Young Men President',
+      'Stake Young Men First Counselor',
+      'Stake Young Men Second Counselor',
+      'Stake Young Men Secretary',
+      'Young Men Camp Director',
+      'Young Men Assistant Camp Director',
+    ],
+  },
+  {
+    label: 'Stake Young Women',
+    roles: [
+      'Stake Young Women President',
+      'Stake Young Women First Counselor',
+      'Stake Young Women Second Counselor',
+      'Stake Young Women Secretary',
+      'Young Women Camp Director',
+      'Young Women Assistant Camp Director',
+    ],
+  },
+  {
+    label: 'Stake Sunday School',
+    roles: [
+      'Stake Sunday School President',
+      'Stake Sunday School First Counselor',
+      'Stake Sunday School Second Counselor',
+      'Stake Sunday School Secretary',
+    ],
+  },
+  {
+    label: 'Stake Primary',
+    roles: [
+      'Stake Primary President',
+      'Stake Primary First Counselor',
+      'Stake Primary Second Counselor',
+      'Stake Primary Secretary',
+      'Stake Primary Music Leader',
+    ],
+  },
+  {
+    label: 'Young Single Adult',
+    roles: [
+      'Stake Young Single Adult Adviser',
+      'Stake Young Single Adult Representative',
+      'Young Single Adult Committee Chair',
+      'Young Single Adult Committee Member',
+    ],
+  },
+  {
+    label: 'Single Adult',
+    roles: ['Stake Single Adult Adviser', 'Stake Single Adult Representative'],
+  },
+  {
+    label: 'Temple & Family History',
+    roles: [
+      'FamilySearch Center Coordinator',
+      'Family History Center Director',
+      'Indexing Specialist',
+    ],
+  },
+  {
+    label: 'Activities & Sports',
+    roles: [
+      'Stake Cultural Arts Director',
+      'Stake Activities Committee Chairman',
+      'Stake Physical Activities Director',
+      'Stake Sports Officials Coordinator',
+      'Stake Sports Official',
+      'Stake Sports Specialist',
+    ],
+  },
+  {
+    label: 'Auditing',
+    roles: ['Audit Committee Chairman', 'Audit Committee Member', 'Auditor'],
+  },
+  {
+    label: 'Church Communication',
+    roles: [
+      'Communication Director',
+      'Assistant Communication Director',
+      'Communication Specialist',
+      'JustServe Specialist',
+    ],
+  },
+  {
+    label: 'Church Service Missionaries',
+    roles: ['Stake CS Missionary'],
+  },
+  {
+    label: 'Facilities',
+    roles: [
+      'Stake Building Representative',
+      'Stake Building Specialist',
+      'Stake Scheduler--Building 1',
+      'Stake Recreation Camp Manager and Scheduler',
+      'Stake Recreation Camp Service Missionary',
+      'Stake Recreation Camp Manager',
+      'Stake Recreation Camp Scheduler',
+    ],
+  },
+  {
+    label: 'For the Strength of Youth',
+    roles: ['FSY Conferences Representative'],
+  },
+  {
+    label: 'History',
+    roles: ['History Specialist'],
+  },
+  {
+    label: 'Military Relations',
+    roles: ['Military Relations Specialist'],
+  },
+  {
+    label: 'Music',
+    roles: ['Stake Music Coordinator', 'Stake Music Adviser', 'Stake Music Specialist'],
+  },
+  {
+    label: 'Seminary & Institute',
+    roles: [
+      'Institute Supervisor',
+      'Institute Teacher',
+      'Seminary Supervisor',
+      'Seminary Teacher',
+      'S&I Succeed in School Supervisor',
+      'S&I Succeed in School Instructor',
+    ],
+  },
+  {
+    label: 'Technology',
+    roles: ['Technology Specialist', 'Stake Interpretation Coordinator', 'Stake Interpreter'],
+  },
+  {
+    label: 'Welfare & Self-Reliance',
+    roles: [
+      'Stake Welfare and Self-Reliance Specialist',
+      'Self-Reliance Group Facilitator',
+      'Stake Disability Specialist',
+      'Disability Activity Leader',
+      'Stake Emergency Preparedness Director',
+      'Stake Recovery Lead',
+      'Emergency Communications Specialist',
+      'Ministering Specialist to H2',
+      'ARP North',
+      'ARP east',
+    ],
+  },
+  {
+    label: 'Additional (Custom)',
+    roles: [
+      'Stake Storehouse Coordinator, East',
+      'Stake Storehouse Coordinator, West',
+      'Temple Ordinance Worker - ATL',
+      'Temple Ordinance Worker - COL',
+      'Asst Stk Camp Director',
+      'Stake YW Camp Director',
+    ],
+  },
 ];
+
+/** Flat list of every stake-level calling. Order is UI order (grouped). */
+export const STAKE_ROLES: readonly string[] = STAKE_ROLE_GROUPS.flatMap((g) => g.roles);
 
 /** Ward-side bishopric roles - Bishop, counselors, clerks, exec secs. */
 export const WARD_BISHOPRIC_ROLES: string[] = [
@@ -80,56 +251,34 @@ export const BRANCH_PRESIDENCY_ROLES: string[] = [
 ];
 
 /**
- * Union of ward-bishopric + branch-presidency roles, in the longest-first
- * order the matcher needs. Longer prefixes come first so "Bishopric First
- * Counselor" and "Ward Assistant Clerk--Finance" match before the bare
- * "Bishop" or "Ward Assistant Clerk". Kept as one array because from the
- * matcher's point of view "bishopric" is one bucket.
+ * Union of ward-bishopric + branch-presidency roles. Kept as one array
+ * because from the matcher's point of view "bishopric" is one bucket;
+ * the matcher sorts by length before iterating so ordering here is UI-
+ * only (dropdowns present them in the order they appear).
  */
 export const BISHOPRIC_ROLES: string[] = [
-  'Bishopric First Counselor',
-  'Bishopric Second Counselor',
-  'Ward Assistant Executive Secretary',
-  'Ward Executive Secretary',
-  'Ward Assistant Clerk--Membership',
-  'Ward Assistant Clerk--Finance',
-  'Ward Assistant Clerk',
-  'Ward Clerk',
-  'Bishop',
-  'Branch Presidency First Counselor',
-  'Branch Presidency Second Counselor',
-  'Branch Executive Secretary',
-  'Branch Assistant Clerk--Finance',
-  'Branch Assistant Clerk--Membership',
-  'Branch Assistant Clerk',
-  'Branch Clerk',
-  'Branch President',
+  ...WARD_BISHOPRIC_ROLES,
+  ...BRANCH_PRESIDENCY_ROLES,
 ];
 
 export const EQ_ROLES: string[] = [
+  'Elders Quorum President',
   'Elders Quorum First Counselor',
   'Elders Quorum Second Counselor',
-  'Elders Quorum Assistant Secretary',
   'Elders Quorum Secretary',
-  'Elders Quorum President',
+  'Elders Quorum Assistant Secretary',
 ];
+
+/** Longest-first ordering — needed so "Assistant Communication Director"
+ *  matches before the bare "Communication Director" would consume it. */
+function longestFirst(roles: readonly string[]): string[] {
+  return [...roles].sort((a, b) => b.length - a.length);
+}
 
 const BUCKETS: Array<{ bucket: Bucket; roles: string[] }> = [
-  { bucket: 'stake', roles: STAKE_ROLES },
-  { bucket: 'bishopric', roles: BISHOPRIC_ROLES },
-  { bucket: 'eq', roles: EQ_ROLES },
-];
-
-const EXCLUDES: string[] = [
-  'Stake Building Representative',
-  'Stake Music Coordinator',
-  'Stake Music Specialist',
-  'Stake Recovery Lead',
-  'Stake Welfare and Self-Reliance Specialist',
-  'Stake Young Single Adult Representative',
-  'Stake Single Adult Representative',
-  'Stake CS Missionary',
-  'Branch Mission Leader',
+  { bucket: 'stake', roles: longestFirst(STAKE_ROLES) },
+  { bucket: 'bishopric', roles: longestFirst(BISHOPRIC_ROLES) },
+  { bucket: 'eq', roles: longestFirst(EQ_ROLES) },
 ];
 
 function escapeRegex(s: string): string {
@@ -145,9 +294,6 @@ function escapeRegex(s: string): string {
 export function extractInScopeCallings(callingsText: string): string[] {
   if (!callingsText) return [];
   let working = ' ' + callingsText + ' ';
-  for (const x of EXCLUDES) {
-    working = working.replace(new RegExp(escapeRegex(x), 'g'), ' '.repeat(x.length));
-  }
   const hits: string[] = [];
   for (const { roles } of BUCKETS) {
     for (const role of roles) {
