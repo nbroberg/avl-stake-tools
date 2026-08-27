@@ -40,11 +40,19 @@ export interface NewCallingWorkflowInput {
 
 export interface AdvanceStatusOptions {
   /**
-   * Free-text name of the presidency member responsible for interviewing
+   * Display name of the presidency member responsible for interviewing
    * and extending the calling. Required when advancing to
-   * `interview_assigned`; ignored otherwise.
+   * `interview_assigned`; ignored otherwise. Restricted at the UI layer
+   * to people whose current callings satisfy the calling's authorities
+   * (see core/calling-authorities.ts).
    */
   assignedTo?: string;
+  /**
+   * Display name of the presidency member or high councilor who set the
+   * person apart. Optional when advancing to `set_apart`; ignored
+   * otherwise. Restricted to the same eligibility as `assignedTo`.
+   */
+  setApartBy?: string;
   /** Optional per-transition note appended to the audit history. */
   note?: string;
 }
@@ -126,6 +134,7 @@ export class CallingsService {
     const ref = doc(db, COLLECTION, workflow.id);
     const dateField = DATE_FIELD_BY_STATUS[newStatus];
     const assignedTo = newStatus === 'interview_assigned' ? options.assignedTo?.trim() : undefined;
+    const setApartBy = newStatus === 'set_apart' ? options.setApartBy?.trim() : undefined;
 
     await runTransaction(db, async (tx) => {
       tx.update(ref, {
@@ -134,11 +143,13 @@ export class CallingsService {
         updatedAt: serverTimestamp(),
         ...(dateField ? { [dateField]: serverTimestamp() } : {}),
         ...(assignedTo ? { assignedTo } : {}),
+        ...(setApartBy ? { setApartBy } : {}),
       });
     });
 
     const noteParts: string[] = [];
     if (assignedTo) noteParts.push(`Assigned to ${assignedTo}.`);
+    if (setApartBy) noteParts.push(`Set apart by ${setApartBy}.`);
     if (options.note?.trim()) noteParts.push(options.note.trim());
     const note = noteParts.join(' ');
 

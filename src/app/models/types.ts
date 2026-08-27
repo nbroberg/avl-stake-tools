@@ -191,9 +191,18 @@ export interface CallingWorkflow {
   /**
    * Presidency member (or clerk) responsible for conducting the interview
    * and extending the calling. Set when the workflow advances to
-   * `interview_assigned`.
+   * `interview_assigned`. The Interview Assigned dropdown is filtered to
+   * people who satisfy the calling's `callSetApart` authorities (see
+   * core/calling-authorities.ts).
    */
   assignedTo?: string;
+  /**
+   * Presidency member or high councilor who set the person apart. Set
+   * when the workflow advances to `set_apart`. The dropdown is filtered
+   * to the same authorities as `assignedTo`. Optional (older workflows
+   * completed without capturing this field).
+   */
+  setApartBy?: string;
   /**
    * UIDs of High Council members who have voted to approve this workflow
    * while it sits at `presidency_approved`. Populated via arrayUnion by

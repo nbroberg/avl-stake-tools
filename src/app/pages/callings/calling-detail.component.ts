@@ -9,11 +9,22 @@ import { canAdvanceStatus, canEditNotes, isHighCouncil, isPresidency } from '../
 import { workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';
+import { PeopleService } from '../../core/people.service';
 import { StatusBadgeComponent } from '../../shared/status-badge.component';
+import {
+  ACTOR_LABELS,
+  APPROVAL_LABELS,
+  SUSTAINER_LABELS,
+  authoritiesFor,
+  eligiblePeople,
+  requiresExternalApproval,
+  requiresHighCouncilApproval,
+} from '../../core/calling-authorities';
 import {
   CALLING_STATUS_LABELS,
   RELEASE_STATUS_LABELS,
   type CallingWorkflow,
+  type Person,
 } from '../../models/types';
 
 function labelsFor(w: CallingWorkflow): Record<string, string> {
@@ -39,11 +50,46 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
                 <span class="muted">Interview assigned to:</span> <strong>{{ w.assignedTo }}</strong>
               </p>
             }
+            @if (w.setApartBy) {
+              <p class="text-sm" style="margin: 0.25rem 0 0">
+                <span class="muted">Set apart by:</span> <strong>{{ w.setApartBy }}</strong>
+              </p>
+            }
           </div>
           <app-status-badge [status]="w.status" [label]="labelsFor(w)[w.status] ?? w.status" />
         </div>
 
-        @if (w.status === 'presidency_approved') {
+        @if (authorities(); as a) {
+          <div class="card stack authorities">
+            <strong>Authorities (Handbook 30.8)</strong>
+            <dl>
+              <dt>Recommended by</dt>
+              <dd>{{ actorList(a.recommend) }}</dd>
+              <dt>Approved by</dt>
+              <dd>{{ APPROVAL_LABELS[a.approve] }}</dd>
+              <dt>Sustained by</dt>
+              <dd>{{ SUSTAINER_LABELS[a.sustain] }}</dd>
+              <dt>Called &amp; set apart by</dt>
+              <dd>{{ actorList(a.callSetApart) }}</dd>
+            </dl>
+            @if (a.notes) {
+              <p class="text-sm muted" style="margin: 0">{{ a.notes }}</p>
+            }
+          </div>
+        }
+
+        @if (externalApproval()) {
+          <div class="card banner">
+            <strong>External approval required</strong>
+            <p class="text-sm" style="margin: 0.25rem 0 0">
+              This calling is approved by {{ APPROVAL_LABELS[authorities()!.approve] }} —
+              secure that approval through LCR before advancing the workflow beyond
+              Stake Presidency Approved.
+            </p>
+          </div>
+        }
+
+        @if (needsHcApproval() && w.status === 'presidency_approved') {
           <div class="card stack">
             <strong>High Council Approval</strong>
             <p class="text-sm" style="margin: 0">
@@ -78,14 +124,56 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
               @if (s === 'interview_assigned') {
                 <div class="field">
                   <label>Assigned to</label>
-                  <input
-                    [ngModel]="pendingAssignee()"
-                    (ngModelChange)="pendingAssignee.set($event)"
-                    placeholder="e.g. President Poole"
-                  />
+                  @if (eligibleExtenders().length > 0) {
+                    <select
+                      [ngModel]="pendingAssignee()"
+                      (ngModelChange)="pendingAssignee.set($event)"
+                    >
+                      <option value="" disabled>Select a person…</option>
+                      @for (p of eligibleExtenders(); track p.id) {
+                        <option [value]="p.name">
+                          {{ p.name }} — {{ eligibilityLabel(p) }}
+                        </option>
+                      }
+                    </select>
+                  } @else {
+                    <p class="text-sm muted" style="margin: 0">
+                      No one in the roster currently holds a calling that would authorize them
+                      to extend this. Import the roster from LCR, or use a name here:
+                    </p>
+                    <input
+                      [ngModel]="pendingAssignee()"
+                      (ngModelChange)="pendingAssignee.set($event)"
+                      placeholder="e.g. President Poole"
+                    />
+                  }
                   <span class="text-sm muted">
-                    Presidency member conducting the interview and extending the calling.
+                    Restricted to: {{ actorList(authorities()?.callSetApart ?? []) }}.
                   </span>
+                </div>
+              }
+              @if (s === 'set_apart') {
+                <div class="field">
+                  <label>Set apart by (optional)</label>
+                  @if (eligibleExtenders().length > 0) {
+                    <select
+                      [ngModel]="pendingSetApartBy()"
+                      (ngModelChange)="pendingSetApartBy.set($event)"
+                    >
+                      <option value="">— unspecified —</option>
+                      @for (p of eligibleExtenders(); track p.id) {
+                        <option [value]="p.name">
+                          {{ p.name }} — {{ eligibilityLabel(p) }}
+                        </option>
+                      }
+                    </select>
+                  } @else {
+                    <input
+                      [ngModel]="pendingSetApartBy()"
+                      (ngModelChange)="pendingSetApartBy.set($event)"
+                      placeholder="Name (optional)"
+                    />
+                  }
                 </div>
               }
               <button
@@ -140,6 +228,28 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
       <p class="muted">Loading…</p>
     }
   `,
+  styles: [
+    `
+      .authorities dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        row-gap: 0.35rem;
+        margin: 0;
+      }
+      .authorities dt {
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .authorities dd { margin: 0; }
+      .banner {
+        border-left: 3px solid var(--warn);
+        background: var(--bg);
+      }
+    `,
+  ],
 })
 export class CallingDetailComponent {
   protected readonly authService = inject(AuthService);
@@ -149,9 +259,12 @@ export class CallingDetailComponent {
   protected readonly labelsFor = labelsFor;
   protected readonly formatTimestamp = formatTimestamp;
   protected readonly hcTotal = HC_TOTAL;
+  protected readonly APPROVAL_LABELS = APPROVAL_LABELS;
+  protected readonly SUSTAINER_LABELS = SUSTAINER_LABELS;
 
   private readonly route = inject(ActivatedRoute);
   private readonly callingsService = inject(CallingsService);
+  private readonly peopleService = inject(PeopleService);
 
   private readonly id = toSignal(this.route.paramMap.pipe(map((params) => params.get('id'))), {
     initialValue: this.route.snapshot.paramMap.get('id'),
@@ -161,14 +274,41 @@ export class CallingDetailComponent {
     initialValue: [] as CallingWorkflow[],
   });
 
+  private readonly people = toSignal(this.peopleService.list(), {
+    initialValue: [] as Person[],
+  });
+
   protected readonly workflow = computed(
     () => this.workflows().find((w) => w.id === this.id()) ?? null,
   );
 
+  protected readonly authorities = computed(() => {
+    const w = this.workflow();
+    return w ? authoritiesFor(w.callingName) : null;
+  });
+
+  protected readonly needsHcApproval = computed(() => {
+    const w = this.workflow();
+    return !!w && requiresHighCouncilApproval(w.callingName);
+  });
+
+  protected readonly externalApproval = computed(() => {
+    const w = this.workflow();
+    return !!w && requiresExternalApproval(w.callingName);
+  });
+
   protected readonly nextStatuses = computed(() => {
     const w = this.workflow();
     if (!w) return [];
-    return getNextStatuses(w.workflowType, w.status);
+    return getNextStatuses(w.workflowType, w.status, w.callingName);
+  });
+
+  /** People eligible to extend the calling and/or set the person apart —
+   *  same list for both actions per Handbook 30.8. */
+  protected readonly eligibleExtenders = computed(() => {
+    const a = this.authorities();
+    if (!a) return [];
+    return eligiblePeople(a.callSetApart, this.people());
   });
 
   protected readonly approvalCount = computed(() => this.workflow()?.hcApprovalUids?.length ?? 0);
@@ -197,6 +337,7 @@ export class CallingDetailComponent {
   // subscription) only repaints the view if it is a signal.
   protected readonly notes = signal('');
   protected readonly pendingAssignee = signal('');
+  protected readonly pendingSetApartBy = signal('');
   protected readonly busy = signal(false);
 
   constructor() {
@@ -230,6 +371,31 @@ export class CallingDetailComponent {
     return true;
   }
 
+  /** Render an actor-role list as a human-readable sentence. */
+  actorList(actors: readonly import('../../core/calling-authorities').Actor[]): string {
+    if (actors.length === 0) return '—';
+    return actors.map((a) => ACTOR_LABELS[a]).join(' · ');
+  }
+
+  /** The person's most workflow-relevant calling, shown after their name
+   *  in the eligibility dropdown so a reader can tell which authority
+   *  qualifies them. Prefers presidency > high council > bishop > branch
+   *  > EQ president; falls back to the first Stake-prefixed calling. */
+  eligibilityLabel(p: Person): string {
+    const callings = p.callings ?? [];
+    const priority = [
+      'Stake President',
+      'Stake Presidency First Counselor',
+      'Stake Presidency Second Counselor',
+      'Stake High Councilor',
+      'Bishop',
+      'Branch President',
+      'Elders Quorum President',
+    ];
+    for (const r of priority) if (callings.includes(r)) return r;
+    return callings.find((c) => c.startsWith('Stake ')) ?? callings[0] ?? '';
+  }
+
   async advance(status: string): Promise<void> {
     const actor = this.authService.appUser();
     const w = this.workflow();
@@ -237,8 +403,10 @@ export class CallingDetailComponent {
     this.busy.set(true);
     try {
       const assignedTo = status === 'interview_assigned' ? this.pendingAssignee().trim() : undefined;
-      await this.callingsService.advanceStatus(w, status, actor, { assignedTo });
+      const setApartBy = status === 'set_apart' ? this.pendingSetApartBy().trim() : undefined;
+      await this.callingsService.advanceStatus(w, status, actor, { assignedTo, setApartBy });
       this.pendingAssignee.set('');
+      this.pendingSetApartBy.set('');
     } finally {
       this.busy.set(false);
     }

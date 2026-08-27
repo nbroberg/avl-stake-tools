@@ -5,22 +5,40 @@ import {
   type CallingWorkflow,
   type CallingWorkflowType,
 } from '../models/types';
+import { requiresHighCouncilApproval } from './calling-authorities';
 
-function statusOrder(type: CallingWorkflowType): string[] {
-  return type === 'release' ? RELEASE_STATUS_ORDER : CALLING_STATUS_ORDER;
+/**
+ * The full status list for a given workflow, with `high_council_approved`
+ * dropped when the calling doesn't require SP+HC approval (ward-internal
+ * callings such as EQ secretary, and callings approved externally by the
+ * First Presidency, Twelve, or a GA). Releases keep their own linear
+ * order regardless of calling.
+ */
+export function statusOrderFor(
+  workflowType: CallingWorkflowType,
+  callingName?: string,
+): string[] {
+  if (workflowType === 'release') return [...RELEASE_STATUS_ORDER];
+  const base = [...CALLING_STATUS_ORDER];
+  if (callingName && !requiresHighCouncilApproval(callingName)) {
+    return base.filter((s) => s !== 'high_council_approved');
+  }
+  return base;
 }
 
 /**
  * Returns the list of statuses that are valid "next steps" from the current
- * one. Both lifecycles are strictly linear in the POC - no optional steps -
- * so this returns either the single next status or an empty array when
- * already at the terminal state.
+ * one. Both lifecycles are strictly linear - no optional steps - so this
+ * returns either the single next status or an empty array when already at
+ * the terminal state. `callingName` is optional; when supplied it lets the
+ * order skip the High Council step for callings that don't need it.
  */
 export function getNextStatuses(
   workflowType: CallingWorkflowType,
   currentStatus: string,
+  callingName?: string,
 ): string[] {
-  const order = statusOrder(workflowType);
+  const order = statusOrderFor(workflowType, callingName);
   const idx = order.indexOf(currentStatus);
   if (idx === -1 || idx === order.length - 1) return [];
   return [order[idx + 1]];
