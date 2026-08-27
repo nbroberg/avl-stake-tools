@@ -62,6 +62,13 @@ import { PeopleService } from '../../core/people.service';
                 </span>
               }
             </strong>
+            @if (!hasPriesthoodOfficeColumn()) {
+              <p class="text-sm muted" style="margin: 0">
+                Heads up: this paste doesn't include the <strong>Priesthood office</strong>
+                column. Re-run the LCR custom report with that column added so the workflow
+                can flag mismatches (e.g. calling an Elder to be Bishop).
+              </p>
+            }
             <table>
               <thead>
                 <tr>
@@ -69,6 +76,7 @@ import { PeopleService } from '../../core/people.service';
                   <th>Name</th>
                   <th>Born</th>
                   <th>Unit</th>
+                  <th>Office</th>
                   <th>In-scope callings</th>
                   <th>Email</th>
                 </tr>
@@ -91,6 +99,15 @@ import { PeopleService } from '../../core/people.service';
                     </td>
                     <td class="muted text-sm">{{ row.birthYear }}</td>
                     <td>{{ row.unitName }}</td>
+                    <td class="muted text-sm">
+                      @if (row.priesthoodOffice === undefined) {
+                        <span>—</span>
+                      } @else if (row.priesthoodOffice === '') {
+                        <span>(none)</span>
+                      } @else {
+                        <span>{{ row.priesthoodOffice }}</span>
+                      }
+                    </td>
                     <td class="text-sm">
                       @for (c of row.callings; track c; let last = $last) {
                         <span>{{ c }}</span>
@@ -128,6 +145,15 @@ export class RosterImportComponent {
   protected readonly saving = signal(false);
 
   protected readonly selectedCount = computed(() => this.selected().size);
+
+  /** True when at least one parsed row saw a Priesthood office cell
+   *  (populated or empty). Distinguishes "the column was in the paste
+   *  and this person happens to have no office" from "the column
+   *  wasn't in the paste at all". */
+  protected readonly hasPriesthoodOfficeColumn = computed(() => {
+    const rows = this.parseResult()?.rows ?? [];
+    return rows.some((r) => r.priesthoodOffice !== undefined);
+  });
 
   doParse(): void {
     const result = parseLcrRoster(this.raw());

@@ -34,13 +34,29 @@ describe('parseLcrRoster', () => {
     });
   });
 
-  it('leaves priesthoodOffice undefined when the LCR row has no office', () => {
+  it('preserves an empty priesthoodOffice cell as "" (known no office)', () => {
+    // HEADER has "Priesthood office" as its last column, so a row with an
+    // empty last cell means LCR reported "no office" — that's positive
+    // data (typically a woman), distinct from the column being absent.
     const out = parseLcrRoster(
       tsv(
         'Doe, Jane\t1985\tAsheville Ward\t\t\t\t' +
           'Stake Relief Society President (1 Jan 2024)\t',
       ),
     );
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].priesthoodOffice).toBe('');
+  });
+
+  it('leaves priesthoodOffice undefined when the column is absent from the paste', () => {
+    // Paste without the Priesthood office column at all — we have no data.
+    const header =
+      'Full Name\tBirth Year\tUnit\tPreferred Name\tIndividual E-mail\tIndividual Phone\tCallings';
+    const raw =
+      header +
+      '\n' +
+      'Smith, John\t1970\tAsheville Ward\tJohn\tjohn@example.com\t555-0000\tBishop';
+    const out = parseLcrRoster(raw);
     expect(out.rows).toHaveLength(1);
     expect(out.rows[0].priesthoodOffice).toBeUndefined();
   });

@@ -233,7 +233,14 @@ export function parseLcrRoster(raw: string): LcrParseResult {
     const rawCallings = at('callings');
     const email = at('email') || undefined;
     const phone = at('phone') || undefined;
-    const priesthoodOffice = at('priesthoodOffice') || undefined;
+    // Distinct semantics matter here: an empty cell in a paste that DOES
+    // include the Priesthood office column is a real fact ("no office" —
+    // typically a woman), whereas the column being absent means we simply
+    // don't know. Preserve the difference: '' when the column is present,
+    // undefined when it isn't. Downstream (personSatisfiesPriesthood,
+    // priesthoodGap) treats '' as female-eligible and undefined as unknown.
+    const priesthoodOffice =
+      cols.priesthoodOffice !== undefined ? at('priesthoodOffice') : undefined;
 
     if (!fullName) {
       errors.push({ line: i + 1, message: 'Row has no Full Name.' });
