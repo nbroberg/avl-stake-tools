@@ -30,7 +30,19 @@ describe('parseLcrRoster', () => {
       sustainedAt: { 'Stake Clerk': '2025-06-15' },
       email: 'sample@example.com',
       phone: '(555) 555-0000',
+      priesthoodOffice: 'Elder',
     });
+  });
+
+  it('leaves priesthoodOffice undefined when the LCR row has no office', () => {
+    const out = parseLcrRoster(
+      tsv(
+        'Doe, Jane\t1985\tAsheville Ward\t\t\t\t' +
+          'Stake Relief Society President (1 Jan 2024)\t',
+      ),
+    );
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].priesthoodOffice).toBeUndefined();
   });
 
   it('falls back to Full Name when Preferred Name is empty', () => {

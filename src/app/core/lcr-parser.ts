@@ -38,6 +38,9 @@ export interface ParsedPersonRow {
   rawCallings: string;
   email?: string;
   phone?: string;
+  /** LCR "Priesthood office" cell if the export included that column.
+   *  Passed through unchanged; empty for women and unordained males. */
+  priesthoodOffice?: string;
 }
 
 export interface LcrParseError {
@@ -54,13 +57,14 @@ export interface LcrParseResult {
 }
 
 const HEADER_PATTERNS = {
-  fullName:      /\bfull\s*name\b/i,
-  preferredName: /\bpreferred\s*name\b/i,
-  birthYear:     /\bbirth\s*year\b/i,
-  unit:          /^unit$/i, // exact "Unit" - not Unit Abbreviation
-  callings:      /\bcallings?\b/i,
-  email:         /\b(individual\s*)?e-?mail\b/i,
-  phone:         /\b(individual\s*)?phone(\s*number)?\b/i,
+  fullName:         /\bfull\s*name\b/i,
+  preferredName:    /\bpreferred\s*name\b/i,
+  birthYear:        /\bbirth\s*year\b/i,
+  unit:             /^unit$/i, // exact "Unit" - not Unit Abbreviation
+  callings:         /\bcallings?\b/i,
+  email:            /\b(individual\s*)?e-?mail\b/i,
+  phone:            /\b(individual\s*)?phone(\s*number)?\b/i,
+  priesthoodOffice: /\bpriesthood\s*office\b/i,
 };
 
 type ColumnMap = Partial<Record<keyof typeof HEADER_PATTERNS, number>>;
@@ -229,6 +233,7 @@ export function parseLcrRoster(raw: string): LcrParseResult {
     const rawCallings = at('callings');
     const email = at('email') || undefined;
     const phone = at('phone') || undefined;
+    const priesthoodOffice = at('priesthoodOffice') || undefined;
 
     if (!fullName) {
       errors.push({ line: i + 1, message: 'Row has no Full Name.' });
@@ -293,6 +298,7 @@ export function parseLcrRoster(raw: string): LcrParseResult {
       rawCallings,
       email,
       phone,
+      priesthoodOffice,
     });
   }
 

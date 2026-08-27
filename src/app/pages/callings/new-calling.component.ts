@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -12,6 +12,11 @@ import {
   EQ_ROLES,
   unitScopeFor,
 } from '../../core/callings-vocabulary';
+import {
+  PRIESTHOOD_REQUIREMENT_LABELS,
+  eligibleCallees,
+  priesthoodRequirementFor,
+} from '../../core/calling-authorities';
 import { STAKE_UNITS, unitLabel } from '../../core/units';
 import type { CallingWorkflowType } from '../../models/types';
 
@@ -50,24 +55,6 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         </div>
 
         <div class="field">
-          <label>Person</label>
-          <select
-            [ngModel]="personId()"
-            (ngModelChange)="personId.set($event)"
-            name="personId"
-            required
-          >
-            <option value="" disabled>Select a person…</option>
-            @for (p of people(); track p.id) {
-              <option [value]="p.id">{{ p.name }} ({{ unitLabel(p.unit) }})</option>
-            }
-          </select>
-          <span class="text-sm muted">
-            Don't see them? Add via <a routerLink="/people">Roster</a> first.
-          </span>
-        </div>
-
-        <div class="field">
           <label>Calling name</label>
           <select
             [ngModel]="callingName()"
@@ -84,6 +71,46 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
               </optgroup>
             }
           </select>
+          @if (callingName() && priesthoodLabel(); as label) {
+            <span class="text-sm muted">
+              Priesthood-office requirement: <strong>{{ label }}</strong>.
+            </span>
+          }
+        </div>
+
+        <div class="field">
+          <label>Person</label>
+          <select
+            [ngModel]="personId()"
+            (ngModelChange)="personId.set($event)"
+            name="personId"
+            required
+          >
+            <option value="" disabled>Select a person…</option>
+            @for (p of eligiblePeople(); track p.id) {
+              <option [value]="p.id">
+                {{ p.name }} ({{ unitLabel(p.unit) }}{{
+                  p.priesthoodOffice ? ' · ' + p.priesthoodOffice : ''
+                }})
+              </option>
+            }
+          </select>
+          @if (callingName() && eligiblePeople().length === 0) {
+            <span class="text-sm muted">
+              No one in the roster meets the priesthood-office requirement for this calling.
+              Import from <a routerLink="/people">Roster</a> with the LCR "Priesthood office"
+              column included, or pick a different calling.
+            </span>
+          } @else if (callingName() && filteredOutCount() > 0) {
+            <span class="text-sm muted">
+              Filtered by priesthood-office requirement — {{ filteredOutCount() }} other
+              {{ filteredOutCount() === 1 ? 'person' : 'people' }} in the roster don't qualify.
+            </span>
+          } @else {
+            <span class="text-sm muted">
+              Don't see them? Add via <a routerLink="/people">Roster</a> first.
+            </span>
+          }
         </div>
 
         @if (unitScope() === 'none') {
@@ -137,6 +164,29 @@ export class NewCallingComponent {
   protected readonly unitLabel = unitLabel;
   protected readonly people = toSignal(this.peopleService.list(), { initialValue: [] });
 
+  /** People whose priesthood office satisfies the selected calling. */
+  protected readonly eligiblePeople = computed(() => {
+    const name = this.callingName();
+    if (!name) return this.people();
+    return eligibleCallees(name, this.people());
+  });
+
+  /** How many people got dropped by the priesthood-office filter, for
+   *  the "N other people don't qualify" hint. */
+  protected readonly filteredOutCount = computed(
+    () => this.people().length - this.eligiblePeople().length,
+  );
+
+  /** Human-readable priesthood-office requirement for the current
+   *  calling. Returns null when the calling has no restriction. */
+  protected readonly priesthoodLabel = computed(() => {
+    const name = this.callingName();
+    if (!name) return null;
+    const req = priesthoodRequirementFor(name);
+    if (req === 'none') return null;
+    return PRIESTHOOD_REQUIREMENT_LABELS[req];
+  });
+
   /** Which kind of unit the currently-selected calling needs, if any. */
   protected readonly unitScope = computed(() => unitScopeFor(this.callingName()));
   /** Unit dropdown, filtered to just the wards or branches for this calling. */
@@ -154,6 +204,18 @@ export class NewCallingComponent {
 
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  constructor() {
+    // Clear the selected person when the calling changes and the current
+    // pick no longer qualifies for it (e.g. Bishop → Stake RS President).
+    effect(() => {
+      const id = this.personId();
+      if (!id) return;
+      if (!this.eligiblePeople().some((p) => p.id === id)) {
+        this.personId.set('');
+      }
+    });
+  }
 
   async submit(): Promise<void> {
     const actor = this.authService.appUser();

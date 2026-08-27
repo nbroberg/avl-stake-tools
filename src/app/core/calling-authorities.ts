@@ -415,3 +415,144 @@ export function eligiblePeople(
   if (roles.size === 0) return [];
   return people.filter((p) => (p.callings ?? []).some((c) => roles.has(c)));
 }
+
+/**
+ * Priesthood-office requirement for a calling — drives the "who can be
+ * called to this" person dropdown on the New Calling form.
+ *
+ *   'none'         — no restriction (auditors, communication, activities,
+ *                    seminary/institute teachers, most stake specialists).
+ *   'female'       — sister callings (RS, YW, Primary presidencies; YW
+ *                    camp director; secretaries in those org presidencies).
+ *   'male'         — any priesthood office (rare; kept for completeness).
+ *   'melchizedek'  — Elder or High Priest (bishopric counselors, ward &
+ *                    branch clerks/exec secs, EQ presidency, stake YM/SS
+ *                    counselors, etc.).
+ *   'high_priest'  — High Priest only (Stake President, counselors, high
+ *                    councilors, Patriarch, Bishop, Stake YM/SS pres —
+ *                    the latter two are chosen from among high councilors).
+ *
+ * `female` is defined as "LCR did not report a priesthood office" —
+ * that's what LCR emits for women, and it's the closest signal the
+ * paste-based import can give us without asking for a Sex column.
+ */
+export type PriesthoodRequirement =
+  | 'none'
+  | 'female'
+  | 'male'
+  | 'melchizedek'
+  | 'high_priest';
+
+export const PRIESTHOOD_REQUIREMENT_LABELS: Record<PriesthoodRequirement, string> = {
+  none: 'Any',
+  female: 'Woman',
+  male: 'Any priesthood office',
+  melchizedek: 'Melchizedek Priesthood (Elder or High Priest)',
+  high_priest: 'High Priest',
+};
+
+/** Callings that override the bucket default. Everything not listed
+ *  falls back: bishopric/EQ → 'melchizedek', stake → 'none'. */
+const PRIESTHOOD_OVERRIDES: Record<string, PriesthoodRequirement> = {
+  // High Priest
+  'Stake President': 'high_priest',
+  'Stake Presidency First Counselor': 'high_priest',
+  'Stake Presidency Second Counselor': 'high_priest',
+  'Stake High Councilor': 'high_priest',
+  Patriarch: 'high_priest',
+  'Stake Young Men President': 'high_priest',
+  'Stake Sunday School President': 'high_priest',
+  'Audit Committee Chairman': 'high_priest',
+  Bishop: 'high_priest',
+
+  // Melchizedek (stake overrides; bishopric/EQ default already MP)
+  'Stake Clerk': 'melchizedek',
+  'Stake Assistant Clerk': 'melchizedek',
+  'Stake Assistant Clerk--Finance': 'melchizedek',
+  'Stake Assistant Clerk--Membership': 'melchizedek',
+  'Stake Executive Secretary': 'melchizedek',
+  'Stake Assistant Executive Secretary': 'melchizedek',
+  'Stake Young Men First Counselor': 'melchizedek',
+  'Stake Young Men Second Counselor': 'melchizedek',
+  'Stake Young Men Secretary': 'melchizedek',
+  'Young Men Camp Director': 'melchizedek',
+  'Young Men Assistant Camp Director': 'melchizedek',
+  'Stake Sunday School First Counselor': 'melchizedek',
+  'Stake Sunday School Second Counselor': 'melchizedek',
+  'Stake Sunday School Secretary': 'melchizedek',
+
+  // Female
+  'Stake Relief Society President': 'female',
+  'Stake Relief Society First Counselor': 'female',
+  'Stake Relief Society Second Counselor': 'female',
+  'Stake Relief Society Secretary': 'female',
+  'Stake Young Women President': 'female',
+  'Stake Young Women First Counselor': 'female',
+  'Stake Young Women Second Counselor': 'female',
+  'Stake Young Women Secretary': 'female',
+  'Young Women Camp Director': 'female',
+  'Young Women Assistant Camp Director': 'female',
+  'Stake Primary President': 'female',
+  'Stake Primary First Counselor': 'female',
+  'Stake Primary Second Counselor': 'female',
+  'Stake Primary Secretary': 'female',
+  'Stake YW Camp Director': 'female',
+};
+
+/** Returns the priesthood-office requirement for a calling, falling back
+ *  to the bucket default when no override is registered. */
+export function priesthoodRequirementFor(callingName: string): PriesthoodRequirement {
+  const override = PRIESTHOOD_OVERRIDES[callingName];
+  if (override) return override;
+  const bucket = bucketOf(callingName);
+  if (bucket === 'bishopric' || bucket === 'eq') return 'melchizedek';
+  return 'none';
+}
+
+function isMelchizedekOffice(office: string): boolean {
+  const o = office.toLowerCase();
+  return o === 'elder' || o === 'high priest' || o === 'bishop' || o === 'patriarch';
+}
+
+function isHighPriestOffice(office: string): boolean {
+  const o = office.toLowerCase();
+  return o === 'high priest' || o === 'bishop' || o === 'patriarch';
+}
+
+/**
+ * Whether an LCR priesthood-office string satisfies the requirement.
+ * A missing/empty office is treated as female (LCR reports no office
+ * for women); this is a lossy signal but the best the paste import
+ * gives us without a Sex column. Callers with better data (a manual
+ * override on Person, say) can extend this later.
+ */
+export function personSatisfiesPriesthood(
+  office: string | null | undefined,
+  requirement: PriesthoodRequirement,
+): boolean {
+  const o = (office ?? '').trim();
+  const hasOffice = o !== '';
+  switch (requirement) {
+    case 'none':
+      return true;
+    case 'female':
+      return !hasOffice;
+    case 'male':
+      return hasOffice;
+    case 'melchizedek':
+      return isMelchizedekOffice(o);
+    case 'high_priest':
+      return isHighPriestOffice(o);
+  }
+}
+
+/** People from the roster whose priesthood office qualifies them to
+ *  receive the calling. Ordered as `people` was; no sorting. */
+export function eligibleCallees(
+  callingName: string,
+  people: readonly Person[],
+): Person[] {
+  const req = priesthoodRequirementFor(callingName);
+  if (req === 'none') return [...people];
+  return people.filter((p) => personSatisfiesPriesthood(p.priesthoodOffice, req));
+}

@@ -75,6 +75,15 @@ export interface Person {
   email?: string;
   phone?: string;
   /**
+   * LCR "Priesthood office" column. Populated by the roster import when
+   * the LCR custom report includes that column. One of "Deacon",
+   * "Teacher", "Priest", "Elder", "High Priest", "Bishop", "Patriarch",
+   * or the empty string (women, unordained males). Used to filter the
+   * person dropdown when creating a workflow for a calling with a
+   * priesthood-office requirement (see core/calling-authorities.ts).
+   */
+  priesthoodOffice?: string;
+  /**
    * In-scope calling roles this person currently holds. Populated by the
    * LCR import; drives the /scope report. Callings outside the
    * presidency/bishopric/EQ vocabulary are dropped at parse time and

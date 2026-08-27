@@ -25,6 +25,7 @@ export interface UpsertPersonInput {
   unit: string;
   email?: string;
   phone?: string;
+  priesthoodOffice?: string;
   callings?: string[];
   sustainedAt?: Record<string, string>;
 }

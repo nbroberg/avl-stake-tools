@@ -160,6 +160,7 @@ export class RosterImportComponent {
           unit: r.unit,
           email: r.email,
           phone: r.phone,
+          priesthoodOffice: r.priesthoodOffice,
           callings: r.callings,
           sustainedAt: Object.keys(r.sustainedAt).length ? r.sustainedAt : undefined,
         });
