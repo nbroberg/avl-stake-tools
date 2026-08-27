@@ -11,8 +11,11 @@
     "start": "ng serve",
     "prebuild": "node scripts/generate-environment.mjs",
     "build": "ng build",
+    "pretype-check": "node scripts/generate-environment.mjs",
     "type-check": "tsc -p tsconfig.app.json --noEmit",
+    "prelint": "node scripts/generate-environment.mjs",
     "lint": "eslint .",
+    "pretest": "node scripts/generate-environment.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

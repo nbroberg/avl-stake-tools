@@ -10,3 +10,8 @@ coverage
 firebase-debug.log
 firestore-debug.log
 .angular
+
+# Generated at build time by scripts/generate-environment.mjs from
+# .env.local (local) or GitHub Actions secrets (CI). Not committed so
+# local Firebase project values don't leak into git history.
+src/environments/environment.ts
