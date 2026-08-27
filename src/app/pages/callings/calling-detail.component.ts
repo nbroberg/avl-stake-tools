@@ -14,9 +14,12 @@ import { StatusBadgeComponent } from '../../shared/status-badge.component';
 import {
   ACTOR_LABELS,
   APPROVAL_LABELS,
+  PRIESTHOOD_REQUIREMENT_LABELS,
   SUSTAINER_LABELS,
   authoritiesFor,
   eligiblePeople,
+  personSatisfiesPriesthood,
+  priesthoodRequirementFor,
   requiresExternalApproval,
   requiresHighCouncilApproval,
 } from '../../core/calling-authorities';
@@ -85,6 +88,22 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
               This calling is approved by {{ APPROVAL_LABELS[authorities()!.approve] }} —
               secure that approval through LCR before advancing the workflow beyond
               Stake Presidency Approved.
+            </p>
+          </div>
+        }
+
+        @if (priesthoodGap(); as gap) {
+          <div class="card banner">
+            <strong>Priesthood ordination needed</strong>
+            <p class="text-sm" style="margin: 0.25rem 0 0">
+              This calling requires <strong>{{ gap.requiredLabel }}</strong>. {{ w.personName }}
+              currently
+              @if (gap.actual) {
+                holds the office of <strong>{{ gap.actual }}</strong>.
+              } @else {
+                has no priesthood office on record.
+              }
+              Confirm an ordination or advancement before setting apart.
             </p>
           </div>
         }
@@ -295,6 +314,42 @@ export class CallingDetailComponent {
   protected readonly externalApproval = computed(() => {
     const w = this.workflow();
     return !!w && requiresExternalApproval(w.callingName);
+  });
+
+  /** The person this workflow is about, resolved from the roster. Null
+   *  while the roster is still loading or the person isn't imported yet
+   *  (e.g. a workflow created before the roster included them). */
+  protected readonly person = computed<Person | null>(() => {
+    const w = this.workflow();
+    if (!w) return null;
+    return this.people().find((p) => p.id === w.personId) ?? null;
+  });
+
+  /**
+   * Non-null when the person's current priesthood office doesn't satisfy
+   * the calling's requirement — drives the ordination-needed banner.
+   * Returns null when there's no restriction, when the requirement is
+   * met, or when we can't resolve the person from the roster (nothing
+   * to compare against). Skipped once the workflow has been set apart —
+   * by then the ordination check is history.
+   */
+  protected readonly priesthoodGap = computed<{
+    requiredLabel: string;
+    actual: string;
+  } | null>(() => {
+    const w = this.workflow();
+    const p = this.person();
+    if (!w || !p) return null;
+    if (w.status === 'set_apart' || w.status === 'recorded_in_lcr' || w.status === 'complete') {
+      return null;
+    }
+    const req = priesthoodRequirementFor(w.callingName);
+    if (req === 'none') return null;
+    if (personSatisfiesPriesthood(p.priesthoodOffice, req)) return null;
+    return {
+      requiredLabel: PRIESTHOOD_REQUIREMENT_LABELS[req],
+      actual: (p.priesthoodOffice ?? '').trim(),
+    };
   });
 
   protected readonly nextStatuses = computed(() => {
