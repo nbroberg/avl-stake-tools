@@ -217,8 +217,22 @@ export interface CallingWorkflow {
    * while it sits at `presidency_approved`. Populated via arrayUnion by
    * each HC member individually; presidency and HC both use size vs
    * `hcRequired` to decide whether the workflow can advance.
+   *
+   * A member may withdraw while the workflow is still at
+   * `presidency_approved`; once it advances, votes are locked.
    */
   hcApprovalUids?: string[];
+  /**
+   * UIDs of High Council members who have registered a concern rather
+   * than approving. A concern never blocks the arithmetic — one member
+   * cannot veto a calling — but it does block the high council's own
+   * quorum-advance path, so an unresolved concern has to be talked
+   * through and cleared, or overridden deliberately by the presidency.
+   *
+   * Mutually exclusive with `hcApprovalUids` per member, enforced in
+   * firestore.rules rather than only in the UI.
+   */
+  hcConcernUids?: string[];
   /**
    * How many HC approvals this workflow needs before advancing to
    * high_council_approved. Snapshotted at create time so mid-vote
@@ -232,6 +246,18 @@ export interface CallingWorkflow {
   updatedAt?: Timestamp;
 }
 
+/**
+ * What a history entry records, beyond the status it was written
+ * against. Absent on plain status transitions; set on the high council
+ * actions so the detail view can fold the trail back into "who currently
+ * approves" without parsing note text.
+ */
+export type HistoryEntryKind =
+  | 'hc_approval'
+  | 'hc_withdrawal'
+  | 'hc_concern'
+  | 'hc_concern_cleared';
+
 /** callingWorkflows/{id}/history/{historyId} - audit trail */
 export interface CallingStatusHistoryEntry {
   id: string;
@@ -240,4 +266,5 @@ export interface CallingStatusHistoryEntry {
   changedByName: string;
   changedAt?: Timestamp;
   note?: string;
+  kind?: HistoryEntryKind;
 }
