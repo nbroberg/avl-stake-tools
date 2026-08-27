@@ -334,16 +334,20 @@ export function hasAnyRole(callings: string[] | undefined, roles: string[]): boo
  * What kind of unit a calling belongs to. Drives the New Calling form's
  * Unit dropdown:
  * - 'none'   → stake-level; no unit is stored or shown.
- * - 'ward'   → ward bishopric or elders quorum; pick from wards only.
+ * - 'ward'   → ward bishopric; pick from wards only.
  * - 'branch' → branch presidency; pick from branches only.
+ * - 'ward_or_branch' → elders quorum; per Handbook 30.8.2 branches
+ *              follow ward rules for internal callings (substituting
+ *              "branch" for "ward"), so an EQ calling could sit inside
+ *              a branch that's large enough to have a formal quorum.
  */
-export type CallingUnitScope = 'none' | 'ward' | 'branch';
+export type CallingUnitScope = 'none' | 'ward' | 'branch' | 'ward_or_branch';
 
 export function unitScopeFor(role: string | null | undefined): CallingUnitScope {
   if (!role) return 'none';
   if (STAKE_ROLES.includes(role)) return 'none';
   if (BRANCH_PRESIDENCY_ROLES.includes(role)) return 'branch';
   if (WARD_BISHOPRIC_ROLES.includes(role)) return 'ward';
-  if (EQ_ROLES.includes(role)) return 'ward';
+  if (EQ_ROLES.includes(role)) return 'ward_or_branch';
   return 'none';
 }
