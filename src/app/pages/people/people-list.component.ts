@@ -16,12 +16,16 @@ import { unitLabel } from '../../core/units';
       <div class="row-between">
         <h1 style="margin: 0">Roster</h1>
         @if (canManageRoster(authService.appUser())) {
-          <a class="btn btn-primary" routerLink="/people/import">Import from LCR</a>
+          <a class="btn btn-primary btn-row-action" routerLink="/people/import">Import from LCR</a>
         }
       </div>
 
       <input
+        type="search"
+        aria-label="Filter roster by name"
         placeholder="Filter by name…"
+        autocapitalize="none"
+        autocomplete="off"
         [ngModel]="filter()"
         (ngModelChange)="filter.set($event)"
       />
@@ -31,27 +35,45 @@ import { unitLabel } from '../../core/units';
         email, phone. This is not a copy of the membership record.
       </p>
 
-      <div class="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Unit</th>
-              <th>Email</th>
-              <th>Phone</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (p of visible(); track p.id) {
+      <div class="card card-flush-sm">
+        <div class="table-wrap">
+          <!-- The stacked class turns each row into a labelled card below
+               640px; the data-label on every cell supplies the field names. -->
+          <table class="stacked">
+            <thead>
               <tr>
-                <td>{{ p.name }}</td>
-                <td>{{ unitLabel(p.unit) }}</td>
-                <td class="muted">{{ p.email ?? '—' }}</td>
-                <td class="muted">{{ p.phone ?? '—' }}</td>
+                <th>Name</th>
+                <th>Unit</th>
+                <th>Email</th>
+                <th>Phone</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (p of visible(); track p.id) {
+                <tr>
+                  <td data-label="Name">{{ p.name }}</td>
+                  <td data-label="Unit">{{ unitLabel(p.unit) }}</td>
+                  <td data-label="Email" class="muted">
+                    @if (p.email) {
+                      <a [href]="'mailto:' + p.email">{{ p.email }}</a>
+                    } @else {
+                      —
+                    }
+                  </td>
+                  <td data-label="Phone" class="muted">
+                    <!-- Tappable on a phone; the roster's main use away from a
+                         desk is reaching someone. -->
+                    @if (p.phone) {
+                      <a [href]="'tel:' + p.phone">{{ p.phone }}</a>
+                    } @else {
+                      —
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
         @if (visible().length === 0) {
           <p class="muted">No people yet.</p>
         }

@@ -6,6 +6,7 @@ import { map, of, switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { formatTimestamp, getNextStatuses } from '../../core/calling-status';
 import { canAdvanceStatus, canEditNotes, isHighCouncil, isPresidency } from '../../core/roles';
+import { namesFor, tally } from '../../core/hc-review';
 import { workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';
@@ -26,6 +27,7 @@ import {
 import {
   CALLING_STATUS_LABELS,
   RELEASE_STATUS_LABELS,
+  type AppUser,
   type CallingWorkflow,
   type Person,
 } from '../../models/types';
@@ -112,25 +114,95 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
           <div class="card stack">
             <strong>High Council Approval</strong>
             <p class="text-sm" style="margin: 0">
-              <strong>{{ approvalCount() }}</strong> of
+              <strong>{{ hc().approved }}</strong> of
               <strong>{{ w.hcRequired ?? hcTotal }}</strong> approvals
               &middot;
-              @if (quorumMet()) {
+              @if (hc().quorumMet) {
                 <span style="color: var(--accent)">quorum met</span>
               } @else {
                 <span class="muted">quorum not yet met</span>
               }
             </p>
 
+            @if (hc().concerns > 0) {
+              <div class="concern-note text-sm">
+                <strong>
+                  {{ hc().concerns }}
+                  {{ hc().concerns === 1 ? 'concern' : 'concerns' }} raised.
+                </strong>
+                A concern isn't a veto, but the high council can't advance past one
+                on its own — talk it through and have it cleared, or the stake
+                presidency can advance deliberately.
+              </div>
+            }
+
+            <!-- Names come from the audit trail, which is the only source a
+                 client may read: users/{uid} is readable only by its owner, so
+                 "who hasn't voted" is deliberately not answerable here. -->
+            @if (isPresidency(authService.appUser())) {
+              <div class="text-sm roster-line">
+                <span class="muted">Approved by:</span>
+                {{ approverNames().names.length > 0 ? approverNames().names.join(', ') : '—' }}
+                @if (approverNames().unnamed > 0) {
+                  <span class="muted">(+{{ approverNames().unnamed }} not named in the trail)</span>
+                }
+              </div>
+              @if (hc().concerns > 0) {
+                <div class="text-sm roster-line">
+                  <span class="muted">Concern from:</span>
+                  {{ concernNames().names.length > 0 ? concernNames().names.join(', ') : '—' }}
+                </div>
+              }
+            }
+
             @if (isHighCouncil(authService.appUser())) {
-              @if (hasVoted()) {
+              <!-- The confirmation is checked FIRST: it can be armed from the
+                   no-position state (Approve) or from a standing concern
+                   (Approve instead), so a position branch must not shadow it. -->
+              @if (confirmingApproval()) {
+                <!-- Deliberate two-step: an approval is hard to unwind once the
+                     workflow advances, and the button sits under a thumb. -->
+                <div class="confirm stack">
+                  <span class="text-sm">
+                    Record your approval of {{ w.personName }} as {{ w.callingName }}?
+                  </span>
+                  <div class="row">
+                    <button class="btn btn-primary" [disabled]="busy()" (click)="approveAsHc()">
+                      Yes, approve
+                    </button>
+                    <button class="btn" [disabled]="busy()" (click)="confirmingApproval.set(false)">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              } @else if (myPosition() === 'approved') {
                 <p class="text-sm" style="margin: 0; color: var(--accent)">
                   ✓ You have approved this calling.
                 </p>
-              } @else {
-                <button class="btn btn-primary" [disabled]="busy()" (click)="approveAsHc()">
-                  Approve
+                <button class="btn btn-responsive" [disabled]="busy()" (click)="withdrawAsHc()">
+                  Withdraw my approval
                 </button>
+              } @else if (myPosition() === 'concern') {
+                <p class="text-sm" style="margin: 0; color: var(--warn)">
+                  ⚠ You have registered a concern.
+                </p>
+                <div class="row">
+                  <button class="btn btn-primary" [disabled]="busy()" (click)="startApprove()">
+                    Approve instead
+                  </button>
+                  <button class="btn" [disabled]="busy()" (click)="clearConcernAsHc()">
+                    Clear my concern
+                  </button>
+                </div>
+              } @else {
+                <div class="row">
+                  <button class="btn btn-primary" [disabled]="busy()" (click)="startApprove()">
+                    Approve
+                  </button>
+                  <button class="btn" [disabled]="busy()" (click)="raiseConcernAsHc()">
+                    Raise a concern
+                  </button>
+                </div>
               }
             }
           </div>
@@ -196,7 +268,7 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
                 </div>
               }
               <button
-                class="btn btn-primary"
+                class="btn btn-primary btn-responsive"
                 [disabled]="busy() || (s === 'interview_assigned' && !pendingAssignee().trim())"
                 (click)="advance(s)"
               >
@@ -223,24 +295,42 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
             [disabled]="!canEditNotes(authService.appUser())"
           ></textarea>
           @if (canEditNotes(authService.appUser())) {
-            <button class="btn" [disabled]="busy()" (click)="saveNotes(w.id)">Save notes</button>
+            <button class="btn btn-responsive" [disabled]="busy()" (click)="saveNotes(w.id)">
+            Save notes
+          </button>
           }
         </div>
 
         <div class="card stack">
           <strong>History</strong>
-          <table>
-            <tbody>
-              @for (h of history(); track h.id) {
+          <div class="table-wrap">
+            <table class="stacked history">
+              <thead>
                 <tr>
-                  <td>{{ formatTimestamp(h.changedAt) }}</td>
-                  <td>{{ labelsFor(w)[h.status] ?? h.status }}</td>
-                  <td class="muted">{{ h.changedByName }}</td>
-                  <td class="muted">{{ h.note ?? '' }}</td>
+                  <th>When</th>
+                  <th>Status</th>
+                  <th>By</th>
+                  <th>Note</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (h of history(); track h.id) {
+                  <tr>
+                    <td data-label="When">{{ formatTimestamp(h.changedAt) }}</td>
+                    <td data-label="Status">{{ labelsFor(w)[h.status] ?? h.status }}</td>
+                    <td data-label="By" class="muted">{{ h.changedByName }}</td>
+                    <!-- Empty notes are the common case; the stacked layout drops
+                         the row rather than printing a bare label. -->
+                    @if (h.note) {
+                      <td data-label="Note" class="muted">{{ h.note }}</td>
+                    } @else {
+                      <td class="note-empty muted"></td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     } @else {
@@ -249,12 +339,22 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
   `,
   styles: [
     `
+      /* Phones stack label over value - a max-content label column plus a name
+         leaves too little room for either at 360px. */
       .authorities dl {
         display: grid;
-        grid-template-columns: max-content 1fr;
-        column-gap: 1rem;
-        row-gap: 0.35rem;
+        grid-template-columns: 1fr;
+        row-gap: 0.15rem;
         margin: 0;
+      }
+      .authorities dt:not(:first-of-type) { margin-top: 0.5rem; }
+      @media (min-width: 640px) {
+        .authorities dl {
+          grid-template-columns: max-content 1fr;
+          column-gap: 1rem;
+          row-gap: 0.35rem;
+        }
+        .authorities dt:not(:first-of-type) { margin-top: 0; }
       }
       .authorities dt {
         font-size: 0.72rem;
@@ -267,6 +367,24 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
         border-left: 3px solid var(--warn);
         background: var(--bg);
       }
+      .concern-note {
+        padding: 0.6rem 0.75rem;
+        border-radius: 8px;
+        border-left: 3px solid var(--warn);
+        background: var(--bg);
+      }
+      .confirm {
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid var(--primary);
+        background: var(--bg);
+        gap: 0.6rem;
+      }
+      .roster-line { line-height: 1.45; }
+      @media (max-width: 639.98px) {
+        /* A cell with no note would otherwise render as an empty stacked row. */
+        .history .note-empty { display: none; }
+      }
     `,
   ],
 })
@@ -274,6 +392,7 @@ export class CallingDetailComponent {
   protected readonly authService = inject(AuthService);
   protected readonly canEditNotes = canEditNotes;
   protected readonly isHighCouncil = isHighCouncil;
+  protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
   protected readonly labelsFor = labelsFor;
   protected readonly formatTimestamp = formatTimestamp;
@@ -366,19 +485,31 @@ export class CallingDetailComponent {
     return eligiblePeople(a.callSetApart, this.people());
   });
 
-  protected readonly approvalCount = computed(() => this.workflow()?.hcApprovalUids?.length ?? 0);
-
-  protected readonly quorumMet = computed(() => {
+  /** Approval/concern counts and whether the council may advance itself. */
+  protected readonly hc = computed(() => {
     const w = this.workflow();
-    if (!w) return false;
-    return this.approvalCount() >= (w.hcRequired ?? Infinity);
+    return w
+      ? tally(w)
+      : { approved: 0, required: 0, concerns: 0, quorumMet: false, clearToAdvance: false };
   });
 
-  protected readonly hasVoted = computed(() => {
+  /** Where the signed-in member currently stands on this workflow. */
+  protected readonly myPosition = computed<'approved' | 'concern' | 'none'>(() => {
     const uid = this.authService.appUser()?.firebaseUid;
-    const uids = this.workflow()?.hcApprovalUids ?? [];
-    return uid ? uids.includes(uid) : false;
+    const w = this.workflow();
+    if (!uid || !w) return 'none';
+    if ((w.hcApprovalUids ?? []).includes(uid)) return 'approved';
+    if ((w.hcConcernUids ?? []).includes(uid)) return 'concern';
+    return 'none';
   });
+
+  protected readonly approverNames = computed(() =>
+    namesFor(this.workflow()?.hcApprovalUids ?? [], this.history()),
+  );
+
+  protected readonly concernNames = computed(() =>
+    namesFor(this.workflow()?.hcConcernUids ?? [], this.history()),
+  );
 
   protected readonly history = toSignal(
     toObservable(this.id).pipe(
@@ -394,6 +525,7 @@ export class CallingDetailComponent {
   protected readonly pendingAssignee = signal('');
   protected readonly pendingSetApartBy = signal('');
   protected readonly busy = signal(false);
+  protected readonly confirmingApproval = signal(false);
 
   constructor() {
     // Seed the notes textarea once the workflow first loads, without
@@ -414,14 +546,15 @@ export class CallingDetailComponent {
   }
 
   /**
-   * HC's advance to high_council_approved is gated by quorum. Presidency
-   * can bypass. All other transitions aren't gated here (the role check
-   * handles them).
+   * HC's advance to high_council_approved needs quorum AND no concern
+   * still outstanding - the same condition firestore.rules enforces.
+   * Presidency can bypass both. All other transitions aren't gated here
+   * (the role check handles them).
    */
   advanceButtonEnabled(w: CallingWorkflow, to: string): boolean {
     if (isPresidency(this.authService.appUser())) return true;
     if (w.status === 'presidency_approved' && to === 'high_council_approved') {
-      return this.quorumMet();
+      return this.hc().clearToAdvance;
     }
     return true;
   }
@@ -467,13 +600,37 @@ export class CallingDetailComponent {
     }
   }
 
+  /** Arm the confirmation step rather than voting on the first tap. */
+  startApprove(): void {
+    this.confirmingApproval.set(true);
+  }
+
   async approveAsHc(): Promise<void> {
+    await this.hcAction((service, id, actor) => service.approveByHighCouncil(id, actor));
+  }
+
+  async withdrawAsHc(): Promise<void> {
+    await this.hcAction((service, id, actor) => service.withdrawHighCouncilApproval(id, actor));
+  }
+
+  async raiseConcernAsHc(): Promise<void> {
+    await this.hcAction((service, id, actor) => service.raiseHighCouncilConcern(id, actor));
+  }
+
+  async clearConcernAsHc(): Promise<void> {
+    await this.hcAction((service, id, actor) => service.clearHighCouncilConcern(id, actor));
+  }
+
+  private async hcAction(
+    run: (service: CallingsService, workflowId: string, actor: AppUser) => Promise<void>,
+  ): Promise<void> {
     const actor = this.authService.appUser();
     const w = this.workflow();
     if (!actor || !w) return;
     this.busy.set(true);
     try {
-      await this.callingsService.approveByHighCouncil(w.id, actor);
+      await run(this.callingsService, w.id, actor);
+      this.confirmingApproval.set(false);
     } finally {
       this.busy.set(false);
     }

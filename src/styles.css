@@ -1,3 +1,8 @@
+/* Mobile-first. Base rules target a phone; @media (min-width: …) blocks add
+   back the roomier desktop treatments. Two breakpoints are used throughout:
+   640px (phone -> large phone/tablet) and 720px (nav moves from a bottom tab
+   bar to a strip under the header). */
+
 :root {
   color-scheme: light;
   --bg: #f4f6f8;
@@ -10,7 +15,22 @@
   --accent: #2f7d5e;
   --danger: #b3261e;
   --warn: #9a6b00;
+
+  /* Minimum comfortable touch target (iOS HIG / Material both land near 44px). */
+  --tap: 44px;
+  /* Height of the fixed bottom tab bar on phones; 0 once the nav moves up top. */
+  --bottom-nav: calc(3.25rem + env(safe-area-inset-bottom));
+  /* Gutters honour notches/rounded corners in landscape. */
+  --gutter-left: max(1rem, env(safe-area-inset-left));
+  --gutter-right: max(1rem, env(safe-area-inset-right));
+
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (min-width: 720px) {
+  :root {
+    --bottom-nav: 0px;
+  }
 }
 
 * {
@@ -22,6 +42,28 @@ html, body {
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
+  /* Keep iOS from re-flowing text at its own scale when the phone rotates. */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Nothing should be able to push the document sideways on a phone. */
+body {
+  overflow-x: hidden;
+}
+
+/* Long unbroken strings (emails, unit names, pasted data) wrap instead of
+   widening their container past the viewport. */
+h1, h2, h3, p, li, dd, dt, td, th, strong, span, a {
+  overflow-wrap: anywhere;
+}
+
+h1 {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+@media (min-width: 640px) {
+  h1 { font-size: 1.75rem; }
 }
 
 a {
@@ -30,10 +72,28 @@ a {
 
 button, input, select, textarea {
   font: inherit;
+  /* Anything under 16px makes mobile Safari zoom the page on focus. */
+  font-size: max(1rem, 16px);
+  max-width: 100%;
 }
 
 button {
   cursor: pointer;
+}
+
+/* Visible keyboard/switch-control focus, including for people pairing a
+   keyboard with a tablet. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Checkboxes and radios default to ~13px, which is well under a fingertip. */
+input[type='checkbox'], input[type='radio'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--primary);
+  flex: none;
 }
 
 .btn {
@@ -47,7 +107,9 @@ button {
   background: var(--surface);
   color: var(--text);
   font-weight: 600;
-  min-height: 44px;
+  min-height: var(--tap);
+  text-decoration: none;
+  touch-action: manipulation;
 }
 
 .btn-primary {
@@ -56,7 +118,13 @@ button {
   color: white;
 }
 
-.btn-primary:hover { background: var(--primary-dark); }
+/* Hover styling only where a real pointer exists - on touch it sticks after
+   a tap and reads as a stuck "pressed" state. */
+@media (hover: hover) {
+  .btn-primary:hover { background: var(--primary-dark); }
+}
+
+.btn-primary:active { background: var(--primary-dark); }
 
 .btn-danger {
   background: var(--danger);
@@ -64,37 +132,80 @@ button {
   color: white;
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .btn-block { width: 100%; }
+
+/* For a button inside a vertical .stack: full width on phones, natural width
+   on wider screens. The auto margin defeats the column's align-items: stretch,
+   which would otherwise keep it full width at any size. */
+.btn-responsive { width: 100%; }
+@media (min-width: 640px) {
+  .btn-responsive { width: auto; margin-right: auto; }
+}
+
+/* For a button sharing a wrapping .row-between with a heading: it takes its own
+   full-width line on phones and sits beside the heading above 640px. */
+.btn-row-action { flex: 1 0 100%; }
+@media (min-width: 640px) {
+  .btn-row-action { flex: 0 0 auto; }
+}
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 1rem;
+  padding: 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .card { padding: 1rem; }
+}
+
+/* For a card whose only job is to frame a `stacked` table: below 640px the
+   rows become cards of their own, so the outer frame is a redundant border. */
+@media (max-width: 639.98px) {
+  .card-flush-sm {
+    border: none;
+    background: none;
+    padding: 0;
+  }
 }
 
 .stack { display: flex; flex-direction: column; gap: 0.75rem; }
 .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
-.row-between { display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; }
+
+/* Wraps rather than squeezing a heading and its action onto one cramped line. */
+.row-between {
+  display: flex;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
 
 .page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 1rem;
-  padding-bottom: 5rem;
+  padding: 1rem var(--gutter-right) calc(1.5rem + var(--bottom-nav)) var(--gutter-left);
 }
 
-.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
 .field label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
-.field input, .field select, .field textarea {
+.field input, .field select, .field textarea,
+input:not([type='checkbox']):not([type='radio']), select, textarea {
+  width: 100%;
   padding: 0.6rem 0.7rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  min-height: 44px;
+  min-height: var(--tap);
   background: var(--surface);
   color: var(--text);
 }
-.field textarea { min-height: 88px; }
+.field textarea, textarea { min-height: 88px; }
 
 .badge {
   display: inline-block;
@@ -117,22 +228,29 @@ button {
   background: var(--surface);
   text-decoration: none;
   color: inherit;
+  /* A whole row is the tap target, so give it a comfortable floor. */
+  min-height: var(--tap);
 }
 .list-item + .list-item { margin-top: 0.6rem; }
+.list-item:active { background: var(--bg); }
 
 .app-shell {
   display: flex;
   flex-direction: column;
+  /* dvh tracks mobile browser chrome as it collapses on scroll. */
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .app-header {
   background: var(--primary);
   color: white;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem var(--gutter-right) 0.6rem var(--gutter-left);
+  padding-top: max(0.6rem, env(safe-area-inset-top));
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -140,40 +258,297 @@ button {
 
 .app-header a { color: white; text-decoration: none; font-weight: 700; }
 
-.app-nav {
-  display: flex;
-  overflow-x: auto;
-  gap: 0.25rem;
-  background: var(--primary-dark);
-  padding: 0.4rem;
+.app-brand {
+  margin-right: auto;
+  min-width: 0;
 }
 
+/* On a phone the identity line drops below the brand/sign-out row instead of
+   competing with them for horizontal space. */
+.app-identity {
+  order: 3;
+  flex-basis: 100%;
+  opacity: 0.9;
+}
+
+.app-signout {
+  order: 2;
+  /* Compact against the header bar without dropping below a tappable size. */
+  padding: 0.35rem 0.75rem;
+  min-height: 36px;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: white;
+}
+
+@media (min-width: 640px) {
+  .app-header { padding-block: 0.75rem; }
+  .app-identity { order: 0; flex-basis: auto; }
+  .app-signout { min-height: var(--tap); padding: 0.6rem 1rem; }
+}
+
+/* Phones: a fixed bottom tab bar, which is both reachable one-handed and the
+   pattern people already expect from native apps. */
+.app-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  background: var(--primary-dark);
+  padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom));
+  padding-left: max(0.25rem, env(safe-area-inset-left));
+  padding-right: max(0.25rem, env(safe-area-inset-right));
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-nav::-webkit-scrollbar { display: none; }
+
 .app-nav a {
-  color: rgba(255,255,255,0.85);
+  /* Grow to share the bar evenly, but never shrink a label into an ellipsis -
+     if the five tabs don't fit (narrow phones, large text settings) the bar
+     scrolls horizontally instead. */
+  flex: 1 0 auto;
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
-  padding: 0.5rem 0.8rem;
+  /* Tight enough that all five labels fit a 320px phone without scrolling. */
+  padding: 0.45rem 0.35rem;
   border-radius: 8px;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
   white-space: nowrap;
 }
 
 .app-nav a.active {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.16);
   color: white;
+}
+
+/* Tablet and up: back to a strip under the header, where a pointer and the
+   extra width make a top nav the better fit. */
+@media (min-width: 720px) {
+  .app-nav {
+    position: static;
+    overflow-x: auto;
+    gap: 0.25rem;
+    padding: 0.4rem var(--gutter-left);
+    border-top: none;
+  }
+  .app-nav a {
+    flex: 0 0 auto;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.9rem;
+    min-height: 0;
+  }
 }
 
 .app-main { flex: 1; }
 
 .center-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 1.5rem var(--gutter-right) 1.5rem var(--gutter-left);
+  padding-top: max(1.5rem, env(safe-area-inset-top));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+/* Any table wide enough to overflow scrolls inside its own box rather than
+   dragging the whole page sideways. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -0.85rem;
+  padding: 0 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .table-wrap { margin: 0; padding: 0; }
 }
 
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+
+/* `table.stacked` turns each row into its own labelled card below 640px, where
+   even a scrolling table is awkward to read. Each <td> needs a data-label. */
+@media (max-width: 639.98px) {
+  table.stacked, table.stacked tbody, table.stacked tr, table.stacked td {
+    display: block;
+    width: 100%;
+  }
+
+  table.stacked thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  table.stacked tr {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface);
+  }
+
+  table.stacked tr + tr { margin-top: 0.6rem; }
+
+  table.stacked td {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: baseline;
+    border: none;
+    padding: 0.2rem 0;
+    min-width: 0;
+  }
+
+  table.stacked td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* A cell with no data-label (e.g. a row checkbox) keeps the full width. */
+  table.stacked td:not([data-label])::before { content: none; }
+
+  table.stacked td > * { text-align: right; min-width: 0; }
+}
+
+/* --- Demo mode ------------------------------------------------------
+   The banner is fixed at the top and the full-height containers below it
+   shrink by its height, so demo mode doesn't leave the page permanently
+   scrolled by a banner's worth of pixels. */
+
+.demo-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: var(--demo-banner-height);
+  padding: 0 var(--gutter-right) 0 var(--gutter-left);
+  padding-top: env(safe-area-inset-top);
+  background: #7a4b00;
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.demo-tag {
+  flex: none;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The explanatory half is the first thing to go when space is tight; the
+   "Demo" tag and the controls have to survive at any width. */
+.demo-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demo-text-short { display: inline; }
+.demo-text-long { display: none; }
+
+@media (min-width: 640px) {
+  .demo-text-short { display: none; }
+  .demo-text-long { display: inline; }
+}
+
+.demo-role {
+  /* Allowed to shrink so the warning text keeps its share of the bar. */
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.demo-role select {
+  width: auto;
+  max-width: 100%;
+  min-height: 1.9rem;
+  padding: 0.1rem 1.4rem 0.1rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.demo-role select option { color: #1a2733; }
+
+.demo-exit {
+  flex: none;
+  min-height: 1.9rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* Screen-reader-only label text. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:root {
+  --demo-banner-height: 0px;
+}
+
+.demo-mode {
+  --demo-banner-height: calc(2.1rem + env(safe-area-inset-top));
+}
+
+/* The banner is out of flow, so the document body reserves its height... */
+.demo-mode body {
+  padding-top: var(--demo-banner-height);
+}
+
+/* ...full-height containers subtract it so demo mode doesn't add a
+   banner's worth of dead scroll... */
+.demo-mode .app-shell,
+.demo-mode .center-screen {
+  min-height: calc(100dvh - var(--demo-banner-height));
+}
+
+/* ...and the app's own sticky header parks below it instead of sliding
+   underneath on scroll. */
+.demo-mode .app-header {
+  top: var(--demo-banner-height);
+}
 
 pre {
   white-space: pre-wrap;
@@ -182,4 +557,11 @@ pre {
   padding: 0.75rem;
   border-radius: 8px;
   font-size: 0.85rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

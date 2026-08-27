@@ -10,17 +10,17 @@ import { ROLE_LABELS } from '../models/types';
   template: `
     <div class="app-shell">
       <header class="app-header">
-        <a routerLink="/">Stake Presidency Tools</a>
-        <div class="row" style="gap: 0.75rem">
-          @if (authService.appUser(); as user) {
-            <span class="text-sm" style="opacity: 0.9">
-              {{ user.displayName }} &middot; {{ roleLabels[user.role] }}
-            </span>
-          }
-          <button class="btn" (click)="signOut()">Sign out</button>
-        </div>
+        <a class="app-brand" routerLink="/">Stake Presidency Tools</a>
+        <!-- On a phone the identity wraps to its own line under the brand;
+             on wider screens it sits inline. See .app-identity in styles.css. -->
+        @if (authService.appUser(); as user) {
+          <span class="app-identity text-sm">
+            {{ user.displayName }} &middot; {{ roleLabels[user.role] }}
+          </span>
+        }
+        <button class="btn app-signout" (click)="signOut()">Sign out</button>
       </header>
-      <nav class="app-nav">
+      <nav class="app-nav" aria-label="Primary">
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
           >Dashboard</a
         >

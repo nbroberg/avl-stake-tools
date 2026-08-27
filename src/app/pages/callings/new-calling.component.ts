@@ -18,7 +18,7 @@ import {
   isSingletonCalling,
   priesthoodRequirementFor,
 } from '../../core/calling-authorities';
-import { STAKE_UNITS, unitLabel } from '../../core/units';
+import { stakeUnits, unitLabel } from '../../core/units';
 import type { CallingWorkflowType, Person } from '../../models/types';
 
 interface CallingOptionGroup {
@@ -254,7 +254,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
           <p class="text-danger text-sm">{{ e }}</p>
         }
 
-        <button class="btn btn-primary" type="submit" [disabled]="saving()">
+        <button class="btn btn-primary btn-responsive" type="submit" [disabled]="saving()">
           {{ saving() ? 'Saving…' : 'Create' }}
         </button>
       </form>
@@ -265,8 +265,13 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
       .candidate-list {
         display: flex;
         flex-direction: column;
-        max-height: 24rem;
+        /* Cap against the viewport rather than a fixed 24rem: on a phone in
+           landscape 24rem is taller than the screen, which traps the page
+           scroll inside this list. */
+        max-height: min(24rem, 60dvh);
         overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
         border: 1px solid var(--border);
         border-radius: 8px;
         background: var(--surface);
@@ -277,17 +282,23 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         align-items: start;
         gap: 0.7rem;
         padding: 0.6rem 0.75rem;
+        /* The whole row is the tap target for the radio inside it. */
+        min-height: var(--tap);
         border-top: 1px solid var(--border);
         cursor: pointer;
+        touch-action: manipulation;
         transition: background-color 120ms ease;
       }
       .candidate:first-child { border-top: none; }
-      .candidate:hover { background: var(--bg); }
+      @media (hover: hover) {
+        .candidate:hover { background: var(--bg); }
+      }
+      .candidate:active { background: var(--bg); }
       .candidate.selected {
         background: var(--bg);
         box-shadow: inset 3px 0 0 var(--primary);
       }
-      .candidate input[type='radio'] { margin-top: 0.25rem; }
+      .candidate input[type='radio'] { margin-top: 0.15rem; }
       .candidate-body {
         display: flex;
         flex-direction: column;
@@ -322,12 +333,16 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
       .swap-list li {
         display: flex;
         align-items: center;
-        gap: 0.6rem;
+        gap: 0.35rem 0.6rem;
         flex-wrap: wrap;
+      }
+      @media (max-width: 639.98px) {
+        .swap-list li .btn { width: 100%; margin-top: 0.15rem; }
       }
       .swap-list .p-name { font-weight: 500; }
       .swap-list .p-meta { font-size: 0.85rem; color: var(--muted); }
-      .btn-sm { padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+      /* Compact chrome, but still a full-height target for a fingertip. */
+      .btn-sm { padding: 0.25rem 0.7rem; font-size: 0.85rem; }
       .candidate-meta {
         font-size: 0.75rem;
         color: var(--muted);
@@ -478,8 +493,8 @@ export class NewCallingComponent {
   protected readonly availableUnits = computed(() => {
     const scope = this.unitScope();
     if (scope === 'none') return [];
-    if (scope === 'ward_or_branch') return [...STAKE_UNITS];
-    return STAKE_UNITS.filter((u) => u.kind === scope);
+    if (scope === 'ward_or_branch') return [...stakeUnits()];
+    return stakeUnits().filter((u) => u.kind === scope);
   });
   /** Placeholder text for the Unit dropdown. */
   protected readonly unitPlaceholder = computed(() => {

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import {
   addDoc,
+  arrayRemove,
   arrayUnion,
   collection,
   doc,
@@ -23,6 +24,7 @@ import type {
   CallingStatusHistoryEntry,
   CallingWorkflow,
   CallingWorkflowType,
+  HistoryEntryKind,
   ReleaseStatus,
 } from '../models/types';
 
@@ -107,6 +109,7 @@ export class CallingsService {
       // they just never hit the presidency_approved -> high_council path
       // where the array is voted into.
       hcApprovalUids: [],
+      hcConcernUids: [],
       hcRequired: HC_QUORUM_REQUIRED,
       createdBy: actor.firebaseUid,
       updatedBy: actor.firebaseUid,
@@ -173,22 +176,101 @@ export class CallingsService {
   /**
    * Record a High Council member's approval on a workflow sitting at
    * `presidency_approved`. Uses arrayUnion so the field converges even
-   * if a double-tap fires two writes in quick succession, and also
-   * writes an audit-history entry naming the voter. Rules enforce that
-   * the caller can only add their own UID (see firestore.rules).
+   * if a double-tap fires two writes in quick succession, and clears any
+   * concern the same member was holding, since the two are mutually
+   * exclusive. Rules enforce that the caller can only move their own UID
+   * (see firestore.rules).
    */
   async approveByHighCouncil(workflowId: string, actor: AppUser): Promise<void> {
-    await updateDoc(doc(db, COLLECTION, workflowId), {
-      hcApprovalUids: arrayUnion(actor.firebaseUid),
-      updatedBy: actor.firebaseUid,
-      updatedAt: serverTimestamp(),
+    await this.recordHcPosition(workflowId, actor, {
+      approve: true,
+      kind: 'hc_approval',
+      note: 'High Council approval recorded.',
     });
+  }
+
+  /**
+   * Take back an approval. Only possible while the workflow is still at
+   * `presidency_approved` - once it advances, the rules stop matching and
+   * the recorded votes are frozen. The withdrawal is appended to the
+   * audit trail rather than erasing the original entry.
+   */
+  async withdrawHighCouncilApproval(workflowId: string, actor: AppUser): Promise<void> {
+    await this.recordHcPosition(workflowId, actor, {
+      approve: false,
+      kind: 'hc_withdrawal',
+      note: 'High Council approval withdrawn.',
+    });
+  }
+
+  /**
+   * Register a concern instead of approving. This is deliberately not a
+   * veto: it doesn't change the approval arithmetic, but it does block
+   * the high council's own quorum-advance path, so the concern has to be
+   * talked through and cleared - or the presidency has to advance the
+   * workflow themselves, on the record.
+   */
+  async raiseHighCouncilConcern(workflowId: string, actor: AppUser): Promise<void> {
+    await this.recordHcPosition(workflowId, actor, {
+      concern: true,
+      kind: 'hc_concern',
+      note: 'High Council concern raised.',
+    });
+  }
+
+  /** Withdraw a previously registered concern. */
+  async clearHighCouncilConcern(workflowId: string, actor: AppUser): Promise<void> {
+    await this.recordHcPosition(workflowId, actor, {
+      concern: false,
+      kind: 'hc_concern_cleared',
+      note: 'High Council concern cleared.',
+    });
+  }
+
+  /**
+   * The one write shape behind all four high council actions: move the
+   * caller's own UID between the approval and concern arrays and append a
+   * matching audit entry. Approving clears a concern and raising a
+   * concern drops an approval, so a member is never counted in both.
+   */
+  private async recordHcPosition(
+    workflowId: string,
+    actor: AppUser,
+    move: {
+      approve?: boolean;
+      concern?: boolean;
+      kind: HistoryEntryKind;
+      note: string;
+    },
+  ): Promise<void> {
+    const uid = actor.firebaseUid;
+    const patch: Record<string, unknown> = {
+      updatedBy: uid,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (move.approve === true) {
+      patch['hcApprovalUids'] = arrayUnion(uid);
+      patch['hcConcernUids'] = arrayRemove(uid);
+    } else if (move.approve === false) {
+      patch['hcApprovalUids'] = arrayRemove(uid);
+    }
+
+    if (move.concern === true) {
+      patch['hcConcernUids'] = arrayUnion(uid);
+      patch['hcApprovalUids'] = arrayRemove(uid);
+    } else if (move.concern === false) {
+      patch['hcConcernUids'] = arrayRemove(uid);
+    }
+
+    await updateDoc(doc(db, COLLECTION, workflowId), patch);
     await addDoc(collection(db, COLLECTION, workflowId, 'history'), {
       status: 'presidency_approved',
-      changedBy: actor.firebaseUid,
+      changedBy: uid,
       changedByName: actor.displayName,
       changedAt: serverTimestamp(),
-      note: 'High Council approval recorded.',
+      kind: move.kind,
+      note: move.note,
     } satisfies WithFieldValue<Omit<CallingStatusHistoryEntry, 'id'>>);
   }
 }
