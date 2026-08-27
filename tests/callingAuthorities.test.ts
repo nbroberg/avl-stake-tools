@@ -3,6 +3,7 @@ import {
   authoritiesFor,
   eligibleCallees,
   eligiblePeople,
+  isSingletonCalling,
   personSatisfiesPriesthood,
   priesthoodRequirementFor,
   requiresExternalApproval,
@@ -244,5 +245,63 @@ describe('eligibleCallees', () => {
   it('filters to women for RS / YW / Primary callings', () => {
     const ids = eligibleCallees('Stake Relief Society Second Counselor', roster).map((p) => p.id);
     expect(ids.sort()).toEqual(['alice', 'carol', 'faye']);
+  });
+});
+
+describe('isSingletonCalling', () => {
+  it('flags presidencies, counselors, secretaries, clerks, chairs as singleton', () => {
+    for (const c of [
+      'Stake President',
+      'Stake Presidency First Counselor',
+      'Stake Relief Society Secretary',
+      'Bishopric Second Counselor',
+      'Stake Clerk',
+      'Ward Clerk',
+      'Branch Clerk',
+      'Stake Assistant Clerk--Finance',
+      'Elders Quorum President',
+      'Elders Quorum Assistant Secretary',
+      'Audit Committee Chairman',
+      'Young Single Adult Committee Chair',
+      'Communication Director',
+      'Assistant Communication Director',
+      'Stake Music Coordinator',
+      'Stake YSA Adviser',
+    ]) {
+      expect(isSingletonCalling(c), `expected singleton: ${c}`).toBe(true);
+    }
+  });
+
+  it('flags Bishop and Patriarch (bare offices) as singleton', () => {
+    expect(isSingletonCalling('Bishop')).toBe(true);
+    expect(isSingletonCalling('Patriarch')).toBe(true);
+  });
+
+  it('flags multi-holder positions as non-singleton', () => {
+    for (const c of [
+      'Stake High Councilor',
+      'Auditor',
+      'Audit Committee Member',
+      'Communication Specialist',
+      'JustServe Specialist',
+      'Stake CS Missionary',
+      'Seminary Teacher',
+      'Institute Teacher',
+      'Young Single Adult Committee Member',
+      'Stake Welfare and Self-Reliance Specialist',
+      'Ministering Specialist to H2',
+      'Temple Ordinance Worker - COL',
+    ]) {
+      expect(isSingletonCalling(c), `expected multi: ${c}`).toBe(false);
+    }
+  });
+
+  it('applies MULTI_OVERRIDES for suffixed-but-multi callings', () => {
+    // These all end in "Clerk"/"Secretary"/"Director" (would look singleton
+    // by suffix) but are multi-holder in practice.
+    expect(isSingletonCalling('Stake Assistant Clerk')).toBe(false);
+    expect(isSingletonCalling('Ward Assistant Clerk')).toBe(false);
+    expect(isSingletonCalling('Stake Assistant Executive Secretary')).toBe(false);
+    expect(isSingletonCalling('Family History Center Director')).toBe(false);
   });
 });

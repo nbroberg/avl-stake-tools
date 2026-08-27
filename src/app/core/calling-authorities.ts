@@ -556,3 +556,61 @@ export function eligibleCallees(
   if (req === 'none') return [...people];
   return people.filter((p) => personSatisfiesPriesthood(p.priesthoodOffice, req));
 }
+
+/**
+ * Whether the calling is a "one seat" position in the org (a president,
+ * counselor, secretary, clerk, etc. rather than a role any number of
+ * people can hold — auditor, high councilor, specialist, teacher).
+ *
+ * Heuristic first: any calling whose last word is one of the singleton
+ * position-suffixes counts. Two small override maps handle the outliers
+ * where the suffix guesses wrong (plain "Assistant Clerk" is multi even
+ * though it ends in "Clerk"; "Family History Center Director" is multi
+ * in this stake even though it ends in "Director"). Also catches the
+ * two bare-word offices, Bishop and Patriarch, which have no such suffix.
+ *
+ * Drives the swap-out prompt on the New Calling form: for a singleton
+ * calling with a current holder, we surface "Release them" alongside
+ * the candidate list.
+ */
+const SINGLETON_SUFFIXES: readonly string[] = [
+  ' President',
+  ' Counselor',
+  ' Secretary',
+  ' Chairman',
+  ' Chair',
+  ' Director',
+  ' Adviser',
+  ' Advisor',
+  ' Coordinator',
+  ' Clerk',
+];
+
+/** Callings that end in a singleton suffix but are actually multi-holder
+ *  in practice (plural per handbook, or custom multi in this stake). */
+const MULTI_OVERRIDES = new Set<string>([
+  'Stake Assistant Clerk',
+  'Ward Assistant Clerk',
+  'Branch Assistant Clerk',
+  'Stake Assistant Executive Secretary',
+  'Ward Assistant Executive Secretary',
+  'Family History Center Director',
+]);
+
+/** Bare-word offices with no singleton suffix that are still singleton. */
+const SINGLETON_OVERRIDES = new Set<string>(['Bishop', 'Patriarch']);
+
+export function isSingletonCalling(callingName: string): boolean {
+  if (MULTI_OVERRIDES.has(callingName)) return false;
+  if (SINGLETON_OVERRIDES.has(callingName)) return true;
+  // LCR uses --Finance / --Membership to specialize a base role; those
+  // are singleton within their subdomain (Stake Assistant Clerk--Finance
+  // is different from Stake Assistant Clerk--Membership; each unit has
+  // at most one of each). Strip the specialization and fall through.
+  const base = callingName.replace(/--(Finance|Membership)$/, ' Clerk');
+  const target = base === callingName ? callingName : base;
+  for (const suffix of SINGLETON_SUFFIXES) {
+    if (target.endsWith(suffix)) return true;
+  }
+  return false;
+}
