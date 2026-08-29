@@ -464,6 +464,13 @@ const PRIESTHOOD_OVERRIDES: Record<string, PriesthoodRequirement> = {
   'Stake Sunday School President': 'high_priest',
   'Audit Committee Chairman': 'high_priest',
   Bishop: 'high_priest',
+  // A ward bishopric is three high priests - the bishop and both
+  // counselors - not just the bishop. Without this override these two
+  // fell through to the bishopric bucket's 'melchizedek' default, which
+  // let an Elder satisfy the requirement outright and skip both the
+  // ordination-needed banner and the advancement link-out.
+  'Bishopric First Counselor': 'high_priest',
+  'Bishopric Second Counselor': 'high_priest',
 
   // Melchizedek (stake overrides; bishopric/EQ default already MP)
   'Stake Clerk': 'melchizedek',

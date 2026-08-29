@@ -159,11 +159,15 @@ describe('priesthoodRequirementFor', () => {
     expect(priesthoodRequirementFor('Stake Sunday School President')).toBe('high_priest');
   });
 
+  it('maps bishopric counselors to high_priest - a ward bishopric is three high priests, not one', () => {
+    expect(priesthoodRequirementFor('Bishopric First Counselor')).toBe('high_priest');
+    expect(priesthoodRequirementFor('Bishopric Second Counselor')).toBe('high_priest');
+  });
+
   it('maps clerks and exec secs (stake and ward) to melchizedek', () => {
     expect(priesthoodRequirementFor('Stake Clerk')).toBe('melchizedek');
     expect(priesthoodRequirementFor('Stake Executive Secretary')).toBe('melchizedek');
     expect(priesthoodRequirementFor('Ward Clerk')).toBe('melchizedek');
-    expect(priesthoodRequirementFor('Bishopric First Counselor')).toBe('melchizedek');
   });
 
   it('maps EQ callings to melchizedek by bucket default', () => {
