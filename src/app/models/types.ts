@@ -187,6 +187,17 @@ export interface CallingWorkflow {
    */
   unit?: string;
   status: CallingStatus | ReleaseStatus;
+  /**
+   * Church-issued unit numbers where a stake-level calling (or release)
+   * has already been sustained. Only meaningful when `unit` is omitted -
+   * a stake calling has no stake conference to sustain it at, so it's
+   * sustained ward-by-ward as the presidency visits each unit, and the
+   * workflow can't advance to `sustained` until this covers every unit
+   * in stakeUnits() (see core/units.ts). Ward/branch-level callings need
+   * only their own unit's sustaining vote, which the plain status
+   * transition already captures - this field stays unused for those.
+   */
+  sustainedInUnits?: string[];
   proposedDate?: Timestamp;
   presidencyApprovedDate?: Timestamp;
   highCouncilApprovedDate?: Timestamp;

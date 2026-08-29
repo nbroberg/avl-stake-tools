@@ -7,7 +7,7 @@ import { CallingsService } from '../../core/callings.service';
 import { formatTimestamp, getNextStatuses } from '../../core/calling-status';
 import { canAdvanceStatus, canEditNotes, isHighCouncil, isPresidency } from '../../core/roles';
 import { namesFor, tally } from '../../core/hc-review';
-import { workflowScopeLabel } from '../../core/units';
+import { stakeUnits, workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';
 import { PeopleService } from '../../core/people.service';
@@ -221,6 +221,33 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
           </div>
         }
 
+        @if (showSustainingChecklist()) {
+          <div class="card stack">
+            <strong>Sustaining across the stake</strong>
+            <p class="text-sm" style="margin: 0">
+              <strong>{{ sustainedUnitCount() }}</strong> of
+              <strong>{{ stakeUnitsList.length }}</strong> units sustained
+              &middot;
+              @if (sustainingComplete()) {
+                <span style="color: var(--accent)">all units done</span>
+              } @else {
+                <span class="muted">no stake conference to sustain this at, so it's ward-by-ward</span>
+              }
+            </p>
+            @for (u of stakeUnitsList; track u.number) {
+              <label class="row" style="gap: 0.5rem; align-items: center">
+                <input
+                  type="checkbox"
+                  [checked]="isUnitSustained(w, u.number)"
+                  [disabled]="busy() || !isPresidency(authService.appUser())"
+                  (change)="toggleUnitSustained(w, u.number, $any($event.target).checked)"
+                />
+                {{ u.name }}
+              </label>
+            }
+          </div>
+        }
+
         @for (s of nextStatuses(); track s) {
           @if (canAdvance(w.status, s) && advanceButtonEnabled(w, s)) {
             <div class="card stack">
@@ -413,6 +440,7 @@ export class CallingDetailComponent {
   protected readonly APPROVAL_LABELS = APPROVAL_LABELS;
   protected readonly SUSTAINER_LABELS = SUSTAINER_LABELS;
   protected readonly ADVANCEMENT_TYPE_LABELS = ADVANCEMENT_TYPE_LABELS;
+  protected readonly stakeUnitsList = stakeUnits();
 
   private readonly route = inject(ActivatedRoute);
   private readonly callingsService = inject(CallingsService);
@@ -495,6 +523,28 @@ export class CallingDetailComponent {
     return getNextStatuses(w.workflowType, w.status, w.callingName);
   });
 
+  /**
+   * A stake-level workflow (no `unit`) one step away from `sustained`
+   * needs a sustaining vote in every ward/branch before it can advance -
+   * there's no stake conference to sustain it at instead. Ward/branch
+   * workflows already carry their one unit and don't need the checklist.
+   */
+  protected readonly showSustainingChecklist = computed(() => {
+    const w = this.workflow();
+    return !!w && !w.unit && this.nextStatuses().includes('sustained');
+  });
+
+  protected readonly sustainedUnitCount = computed(
+    () => this.workflow()?.sustainedInUnits?.length ?? 0,
+  );
+
+  protected readonly sustainingComplete = computed(() => {
+    const w = this.workflow();
+    if (!w) return false;
+    const done = new Set(w.sustainedInUnits ?? []);
+    return this.stakeUnitsList.every((u) => done.has(u.number));
+  });
+
   /** People eligible to extend the calling and/or set the person apart —
    *  same list for both actions per Handbook 30.8. */
   protected readonly eligibleExtenders = computed(() => {
@@ -570,11 +620,33 @@ export class CallingDetailComponent {
    * (the role check handles them).
    */
   advanceButtonEnabled(w: CallingWorkflow, to: string): boolean {
+    if (to === 'sustained' && !w.unit) {
+      return this.sustainingComplete();
+    }
     if (isPresidency(this.authService.appUser())) return true;
     if (w.status === 'presidency_approved' && to === 'high_council_approved') {
       return this.hc().clearToAdvance;
     }
     return true;
+  }
+
+  isUnitSustained(w: CallingWorkflow, unitNumber: string): boolean {
+    return (w.sustainedInUnits ?? []).includes(unitNumber);
+  }
+
+  async toggleUnitSustained(w: CallingWorkflow, unitNumber: string, checked: boolean): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      if (checked) {
+        await this.callingsService.markUnitSustained(w.id, unitNumber, actor);
+      } else {
+        await this.callingsService.unmarkUnitSustained(w.id, unitNumber, actor);
+      }
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Render an actor-role list as a human-readable sentence. */

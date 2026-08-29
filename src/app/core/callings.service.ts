@@ -174,6 +174,30 @@ export class CallingsService {
   }
 
   /**
+   * Record that a stake-level workflow has been sustained in one more
+   * unit. Only meaningful while the workflow has no `unit` of its own
+   * (see CallingWorkflow.sustainedInUnits) - the UI only offers this for
+   * stake-wide callings/releases, but nothing here re-checks that, since
+   * marking a unit on a ward-level workflow is harmless, just unused.
+   */
+  async markUnitSustained(workflowId: string, unitNumber: string, actor: AppUser): Promise<void> {
+    await updateDoc(doc(db, COLLECTION, workflowId), {
+      sustainedInUnits: arrayUnion(unitNumber),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /** Undo a mis-click - removes one unit from the sustained-in list. */
+  async unmarkUnitSustained(workflowId: string, unitNumber: string, actor: AppUser): Promise<void> {
+    await updateDoc(doc(db, COLLECTION, workflowId), {
+      sustainedInUnits: arrayRemove(unitNumber),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  /**
    * Record a High Council member's approval on a workflow sitting at
    * `presidency_approved`. Uses arrayUnion so the field converges even
    * if a double-tap fires two writes in quick succession, and clears any
