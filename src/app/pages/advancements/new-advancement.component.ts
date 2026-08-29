@@ -41,8 +41,18 @@ const ADVANCEMENT_TYPES: PriesthoodAdvancementType[] = ['priest_to_elder', 'elde
         <div class="field">
           <label>Person</label>
           @if (eligiblePeople().length > 0) {
+            <input
+              type="search"
+              [ngModel]="personQuery()"
+              (ngModelChange)="personQuery.set($event)"
+              name="personQuery"
+              placeholder="Search by name…"
+              aria-label="Search candidates by name"
+            />
+          }
+          @if (searchedPeople().length > 0) {
             <div class="candidate-list" role="radiogroup" aria-label="Select the person to advance">
-              @for (p of eligiblePeople(); track p.id) {
+              @for (p of searchedPeople(); track p.id) {
                 <label class="candidate" [class.selected]="personId() === p.id">
                   <input
                     type="radio"
@@ -59,6 +69,10 @@ const ADVANCEMENT_TYPES: PriesthoodAdvancementType[] = ['priest_to_elder', 'elde
                 </label>
               }
             </div>
+          } @else if (eligiblePeople().length > 0 && personQuery().trim()) {
+            <span class="text-sm muted">
+              No one matches "{{ personQuery().trim() }}".
+            </span>
           } @else {
             <span class="text-sm muted">
               No one in the roster is currently on record as {{ fromOffice() }}.
@@ -164,6 +178,18 @@ export class NewAdvancementComponent {
     return this.people()
       .filter((p) => (p.priesthoodOffice ?? '').trim().toLowerCase() === from)
       .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  protected readonly personQuery = signal('');
+
+  /** eligiblePeople further narrowed by the name search box. Search never
+   *  affects eligibility - only what's iterated in the template - so a
+   *  selected person stays selected even if a later search hides their
+   *  row. */
+  protected readonly searchedPeople = computed(() => {
+    const q = this.personQuery().trim().toLowerCase();
+    if (!q) return this.eligiblePeople();
+    return this.eligiblePeople().filter((p) => p.name.toLowerCase().includes(q));
   });
 
   constructor() {

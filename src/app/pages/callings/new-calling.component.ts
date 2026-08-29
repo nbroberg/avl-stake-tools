@@ -154,6 +154,16 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
             {{ workflowType() === 'release' ? 'Person to release' : 'Person' }}
           </label>
           @if (displayedCandidates().length > 0) {
+            <input
+              type="search"
+              [ngModel]="personQuery()"
+              (ngModelChange)="personQuery.set($event)"
+              name="personQuery"
+              placeholder="Search by name…"
+              aria-label="Search candidates by name"
+            />
+          }
+          @if (searchedCandidates().length > 0) {
             <div
               class="candidate-list"
               role="radiogroup"
@@ -163,7 +173,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
                   : 'Select the person for this calling'
               "
             >
-              @for (p of displayedCandidates(); track p.id) {
+              @for (p of searchedCandidates(); track p.id) {
                 <label
                   class="candidate"
                   [class.selected]="personId() === p.id"
@@ -202,6 +212,10 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
                 </label>
               }
             </div>
+          } @else if (displayedCandidates().length > 0 && personQuery().trim()) {
+            <span class="text-sm muted">
+              No one matches "{{ personQuery().trim() }}".
+            </span>
           }
           @if (workflowType() === 'release') {
             @if (callingName() && displayedCandidates().length === 0) {
@@ -455,6 +469,18 @@ export class NewCallingComponent {
       ? this.releaseCandidates()
       : this.sortedEligiblePeople(),
   );
+
+  protected readonly personQuery = signal('');
+
+  /** displayedCandidates further narrowed by the name search box. Search
+   *  never affects eligibility - only what's iterated in the template -
+   *  so a selected person stays selected even if a later search hides
+   *  their row. */
+  protected readonly searchedCandidates = computed(() => {
+    const q = this.personQuery().trim().toLowerCase();
+    if (!q) return this.displayedCandidates();
+    return this.displayedCandidates().filter((p) => p.name.toLowerCase().includes(q));
+  });
 
   /** Calling dropdown options in the current mode. For a release, we
    *  hide every calling nobody in the roster holds — you can't release
