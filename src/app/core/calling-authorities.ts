@@ -3,7 +3,7 @@ import {
   WARD_BISHOPRIC_ROLES,
   bucketOf,
 } from './callings-vocabulary';
-import type { Person } from '../models/types';
+import type { Person, PriesthoodAdvancementType } from '../models/types';
 
 /**
  * Handbook 30.8 (Chart of Callings) encoded for this stake. For each
@@ -546,15 +546,50 @@ export function personSatisfiesPriesthood(
   }
 }
 
+/**
+ * The requirement used to decide who may be offered as a CANDIDATE for a
+ * calling - looser than the calling's true requirement for 'high_priest'.
+ * Handbook practice frequently ordains someone a High Priest concurrent
+ * with being set apart (Bishop, Stake President, a high councilor, etc.),
+ * so the New Calling form accepts any Melchizedek Priesthood holder
+ * rather than blocking the candidate list on an ordination that hasn't
+ * happened yet. The true requirement is unaffected here - see
+ * priesthoodRequirementFor/personSatisfiesPriesthood, which still drive
+ * the "priesthood ordination needed" banner on the workflow detail page
+ * and advancementToClose below.
+ */
+function candidacyRequirementFor(requirement: PriesthoodRequirement): PriesthoodRequirement {
+  return requirement === 'high_priest' ? 'melchizedek' : requirement;
+}
+
 /** People from the roster whose priesthood office qualifies them to
  *  receive the calling. Ordered as `people` was; no sorting. */
 export function eligibleCallees(
   callingName: string,
   people: readonly Person[],
 ): Person[] {
-  const req = priesthoodRequirementFor(callingName);
+  const req = candidacyRequirementFor(priesthoodRequirementFor(callingName));
   if (req === 'none') return [...people];
   return people.filter((p) => personSatisfiesPriesthood(p.priesthoodOffice, req));
+}
+
+/**
+ * Which priesthood advancement (if any) would close the gap between a
+ * person's current office and a calling's TRUE requirement. Only the two
+ * transitions the advancement flow tracks are ever suggested - a deeper
+ * gap (e.g. a Deacon called to a High Priest calling, or no office on
+ * record at all) has no single advancement to point to and returns
+ * undefined; the ordination-needed banner still shows, it just has
+ * nothing to link to.
+ */
+export function advancementToClose(
+  actualOffice: string | null | undefined,
+  requirement: PriesthoodRequirement,
+): PriesthoodAdvancementType | undefined {
+  const office = (actualOffice ?? '').trim().toLowerCase();
+  if (requirement === 'melchizedek' && office === 'priest') return 'priest_to_elder';
+  if (requirement === 'high_priest' && office === 'elder') return 'elder_to_high_priest';
+  return undefined;
 }
 
 /**

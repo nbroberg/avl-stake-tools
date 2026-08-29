@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { PriesthoodAdvancementsService } from '../../core/priesthood-advancements.service';
 import { PeopleService } from '../../core/people.service';
 import { AuthService } from '../../core/auth.service';
@@ -141,6 +141,7 @@ export class NewAdvancementComponent {
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
   private readonly peopleService = inject(PeopleService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly advancementTypes = ADVANCEMENT_TYPES;
   protected readonly typeLabels = ADVANCEMENT_TYPE_LABELS;
@@ -166,14 +167,34 @@ export class NewAdvancementComponent {
   });
 
   constructor() {
+    // Prefill from query params when the form is reached via a
+    // "Start an advancement" link, e.g. from the priesthood-ordination
+    // banner on a calling's detail page: ?type=elder_to_high_priest&
+    // personId=… arrives with the type and candidate already known.
+    const qp = this.route.snapshot.queryParamMap;
+    const qpType = qp.get('type');
+    if (qpType === 'priest_to_elder' || qpType === 'elder_to_high_priest') {
+      this.advancementType.set(qpType);
+    }
+    const qpPerson = qp.get('personId');
+    if (qpPerson) this.personId.set(qpPerson);
+
     // Changing the advancement type can invalidate the selected person
     // (they no longer hold the required starting office for the new
     // type) - clear the selection rather than silently submitting a
-    // stale personId.
+    // stale personId. Skip the very first pass so the query-param
+    // prefill above isn't wiped before the roster snapshot loads
+    // (eligiblePeople starts empty).
+    let firstPass = true;
     effect(() => {
       const id = this.personId();
+      const candidates = this.eligiblePeople();
+      if (firstPass) {
+        firstPass = false;
+        return;
+      }
       if (!id) return;
-      if (!this.eligiblePeople().some((p) => p.id === id)) {
+      if (!candidates.some((p) => p.id === id)) {
         this.personId.set('');
       }
     });

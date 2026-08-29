@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map, of, switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { formatTimestamp, getNextStatuses } from '../../core/calling-status';
@@ -17,6 +17,7 @@ import {
   APPROVAL_LABELS,
   PRIESTHOOD_REQUIREMENT_LABELS,
   SUSTAINER_LABELS,
+  advancementToClose,
   authoritiesFor,
   eligiblePeople,
   personSatisfiesPriesthood,
@@ -25,11 +26,13 @@ import {
   requiresHighCouncilApproval,
 } from '../../core/calling-authorities';
 import {
+  ADVANCEMENT_TYPE_LABELS,
   CALLING_STATUS_LABELS,
   RELEASE_STATUS_LABELS,
   type AppUser,
   type CallingWorkflow,
   type Person,
+  type PriesthoodAdvancementType,
 } from '../../models/types';
 
 function labelsFor(w: CallingWorkflow): Record<string, string> {
@@ -42,7 +45,7 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
 @Component({
   selector: 'app-calling-detail',
   standalone: true,
-  imports: [FormsModule, StatusBadgeComponent],
+  imports: [FormsModule, RouterLink, StatusBadgeComponent],
   template: `
     @if (workflow(); as w) {
       <div class="stack">
@@ -107,6 +110,16 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
               }
               Confirm an ordination or advancement before setting apart.
             </p>
+            @if (gap.suggestedAdvancement; as advType) {
+              <a
+                class="btn"
+                style="margin-top: 0.5rem; align-self: flex-start"
+                [routerLink]="['/advancements/new']"
+                [queryParams]="{ type: advType, personId: w.personId }"
+              >
+                Start {{ ADVANCEMENT_TYPE_LABELS[advType] }} advancement
+              </a>
+            }
           </div>
         }
 
@@ -399,6 +412,7 @@ export class CallingDetailComponent {
   protected readonly hcTotal = HC_TOTAL;
   protected readonly APPROVAL_LABELS = APPROVAL_LABELS;
   protected readonly SUSTAINER_LABELS = SUSTAINER_LABELS;
+  protected readonly ADVANCEMENT_TYPE_LABELS = ADVANCEMENT_TYPE_LABELS;
 
   private readonly route = inject(ActivatedRoute);
   private readonly callingsService = inject(CallingsService);
@@ -455,6 +469,9 @@ export class CallingDetailComponent {
   protected readonly priesthoodGap = computed<{
     requiredLabel: string;
     actual: string;
+    /** Which advancement would close this gap, when there is one to
+     *  suggest - see core/calling-authorities.ts's advancementToClose(). */
+    suggestedAdvancement?: PriesthoodAdvancementType;
   } | null>(() => {
     const w = this.workflow();
     const p = this.person();
@@ -468,6 +485,7 @@ export class CallingDetailComponent {
     return {
       requiredLabel: PRIESTHOOD_REQUIREMENT_LABELS[req],
       actual: (p.priesthoodOffice ?? '').trim(),
+      suggestedAdvancement: advancementToClose(p.priesthoodOffice, req),
     };
   });
 

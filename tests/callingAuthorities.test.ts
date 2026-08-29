@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  advancementToClose,
   authoritiesFor,
   eligibleCallees,
   eligiblePeople,
@@ -237,14 +238,39 @@ describe('eligibleCallees', () => {
     expect(ids.sort()).toEqual(['bob', 'dave']);
   });
 
-  it('filters to High Priests for HP callings', () => {
+  it('accepts any Melchizedek holder for HP callings, not only High Priests', () => {
+    // Handbook practice frequently ordains someone a High Priest
+    // concurrent with being set apart, so an Elder is a valid candidate -
+    // the true 'high_priest' requirement still drives the
+    // ordination-needed banner on the workflow detail page.
     const ids = eligibleCallees('Bishop', roster).map((p) => p.id);
-    expect(ids).toEqual(['dave']);
+    expect(ids.sort()).toEqual(['bob', 'dave']);
   });
 
   it('filters to women for RS / YW / Primary callings', () => {
     const ids = eligibleCallees('Stake Relief Society Second Counselor', roster).map((p) => p.id);
     expect(ids.sort()).toEqual(['alice', 'carol', 'faye']);
+  });
+});
+
+describe('advancementToClose', () => {
+  it('suggests Priest -> Elder when a melchizedek calling gets a Priest', () => {
+    expect(advancementToClose('Priest', 'melchizedek')).toBe('priest_to_elder');
+  });
+
+  it('suggests Elder -> High Priest when a high_priest calling gets an Elder', () => {
+    expect(advancementToClose('Elder', 'high_priest')).toBe('elder_to_high_priest');
+  });
+
+  it('has nothing to suggest when the office already satisfies the requirement', () => {
+    expect(advancementToClose('Elder', 'melchizedek')).toBeUndefined();
+    expect(advancementToClose('High Priest', 'high_priest')).toBeUndefined();
+  });
+
+  it('has nothing to suggest for a gap deeper than one advancement', () => {
+    expect(advancementToClose('Deacon', 'high_priest')).toBeUndefined();
+    expect(advancementToClose('', 'melchizedek')).toBeUndefined();
+    expect(advancementToClose(undefined, 'high_priest')).toBeUndefined();
   });
 });
 
