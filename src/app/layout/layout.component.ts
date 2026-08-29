@@ -25,6 +25,7 @@ import { ROLE_LABELS } from '../models/types';
           >Dashboard</a
         >
         <a routerLink="/callings" routerLinkActive="active">Callings</a>
+        <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
         <a routerLink="/scope" routerLinkActive="active">Scope</a>
         <a routerLink="/people" routerLinkActive="active">Roster</a>
         <a routerLink="/diagnostics" routerLinkActive="active">Diagnostics</a>

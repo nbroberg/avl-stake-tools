@@ -4,14 +4,17 @@ import { DEMO_UNITS } from './demo-units';
 import { AuthService } from '../auth.service';
 import { CallingsService } from '../callings.service';
 import { PeopleService } from '../people.service';
+import { PriesthoodAdvancementsService } from '../priesthood-advancements.service';
 import { DemoAuthService } from './demo-auth.service';
 import { DemoCallingsService } from './demo-callings.service';
 import { DemoPeopleService } from './demo-people.service';
+import { DemoPriesthoodAdvancementsService } from './demo-priesthood-advancements.service';
 
 const demoProviders: Provider[] = [
   { provide: AuthService, useClass: DemoAuthService },
   { provide: PeopleService, useClass: DemoPeopleService },
   { provide: CallingsService, useClass: DemoCallingsService },
+  { provide: PriesthoodAdvancementsService, useClass: DemoPriesthoodAdvancementsService },
 ];
 
 /**

@@ -1,13 +1,15 @@
-import { requiresHighCouncilApproval } from './calling-authorities';
 import * as hcVote from './hc-vote';
-import type { AppUser, CallingStatusHistoryEntry, CallingWorkflow } from '../models/types';
+import type {
+  AdvancementHistoryEntry,
+  AppUser,
+  PriesthoodAdvancementWorkflow,
+} from '../models/types';
 
 /**
- * Calling-specific wrapper over the shared high council vote mechanics in
- * core/hc-vote.ts. The only thing specific to callings here is "is the
- * vote open" - it also depends on requiresHighCouncilApproval(callingName),
- * since some callings are approved outside the stake (First Presidency,
- * Twelve, a GA) and never reach a high council vote at all.
+ * Advancement-specific wrapper over the shared high council vote mechanics
+ * in core/hc-vote.ts. Unlike callings (see core/hc-review.ts), every
+ * advancement goes through the same SP+HC review - there's no per-type
+ * exception - so "is the vote open" here is just the status check.
  *
  * None of it is a security boundary: firestore.rules decides what an HC
  * member may actually write. These functions only decide what to show.
@@ -17,30 +19,33 @@ import type { AppUser, CallingStatusHistoryEntry, CallingWorkflow } from '../mod
 const VOTING_STATUS = 'presidency_approved';
 
 /** True when this workflow is at the point of needing high council votes. */
-export function isOpenForHighCouncilVote(workflow: CallingWorkflow): boolean {
-  return workflow.status === VOTING_STATUS && requiresHighCouncilApproval(workflow.callingName);
+export function isOpenForHighCouncilVote(workflow: PriesthoodAdvancementWorkflow): boolean {
+  return workflow.status === VOTING_STATUS;
 }
 
 /**
  * True when this specific user still owes this workflow a response -
  * they're on the high council, the vote is open, and they have neither
- * approved nor registered a concern. Drives the "awaiting you" surfacing.
+ * approved nor registered a concern.
  */
 export function awaitsResponseFrom(
-  workflow: CallingWorkflow,
+  workflow: PriesthoodAdvancementWorkflow,
   user: AppUser | null,
 ): boolean {
   return hcVote.awaitsResponseFrom(isOpenForHighCouncilVote(workflow), workflow, user);
 }
 
 /** Whether the user has already approved or raised a concern. */
-export function hasRespondedTo(workflow: CallingWorkflow, user: AppUser | null): boolean {
+export function hasRespondedTo(
+  workflow: PriesthoodAdvancementWorkflow,
+  user: AppUser | null,
+): boolean {
   return hcVote.hasRespondedTo(workflow, user);
 }
 
 export type HcTally = hcVote.HcTally;
 
-export function tally(workflow: CallingWorkflow): HcTally {
+export function tally(workflow: PriesthoodAdvancementWorkflow): HcTally {
   return hcVote.tally(workflow);
 }
 
@@ -51,7 +56,7 @@ export function tally(workflow: CallingWorkflow): HcTally {
  */
 export function namesFor(
   uids: readonly string[],
-  history: readonly CallingStatusHistoryEntry[],
+  history: readonly AdvancementHistoryEntry[],
 ): { names: string[]; unnamed: number } {
   return hcVote.namesFor(uids, history);
 }

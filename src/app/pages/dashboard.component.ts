@@ -3,7 +3,9 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
+import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
 import { awaitsResponseFrom } from '../core/hc-review';
+import { awaitsResponseFrom as awaitsAdvancementResponseFrom } from '../core/advancement-review';
 import { isHighCouncil } from '../core/roles';
 
 @Component({
@@ -50,7 +52,20 @@ import { isHighCouncil } from '../core/roles';
               Review and record your approval, or raise a concern.
             </div>
           </a>
-        } @else {
+        }
+        @if (awaitingAdvancementCount() > 0) {
+          <a class="call-to-action" routerLink="/advancements">
+            <div class="cta-count">{{ awaitingAdvancementCount() }}</div>
+            <strong>
+              priesthood {{ awaitingAdvancementCount() === 1 ? 'advancement awaits' : 'advancements await' }}
+              your response
+            </strong>
+            <div class="muted text-sm">
+              Review and record your approval, or raise a concern.
+            </div>
+          </a>
+        }
+        @if (awaitingCount() === 0 && awaitingAdvancementCount() === 0) {
           <p class="muted">Nothing is waiting on your approval right now.</p>
         }
       } @else {
@@ -61,6 +76,10 @@ import { isHighCouncil } from '../core/roles';
         <a class="list-item" routerLink="/callings">
           <strong>Callings &amp; Sustainings</strong>
           <div class="muted text-sm">Track proposed callings and releases through completion.</div>
+        </a>
+        <a class="list-item" routerLink="/advancements">
+          <strong>Priesthood Advancements</strong>
+          <div class="muted text-sm">Track Priest→Elder and Elder→High Priest approvals.</div>
         </a>
         <a class="list-item" routerLink="/scope">
           <strong>Stake Scope</strong>
@@ -87,8 +106,19 @@ export class DashboardComponent {
     initialValue: [],
   });
 
+  private readonly advancementsService = inject(PriesthoodAdvancementsService);
+  private readonly advancementWorkflows = toSignal(this.advancementsService.listWorkflows(), {
+    initialValue: [],
+  });
+
   protected readonly awaitingCount = computed(() => {
     const user = this.authService.appUser();
     return this.workflows().filter((w) => awaitsResponseFrom(w, user)).length;
+  });
+
+  protected readonly awaitingAdvancementCount = computed(() => {
+    const user = this.authService.appUser();
+    return this.advancementWorkflows().filter((w) => awaitsAdvancementResponseFrom(w, user))
+      .length;
   });
 }

@@ -268,3 +268,101 @@ export interface CallingStatusHistoryEntry {
   note?: string;
   kind?: HistoryEntryKind;
 }
+
+/**
+ * Priesthood advancement: Priest -> Elder, or Elder -> High Priest. Per
+ * stake direction, the bishop is not part of this app's flow (for now) -
+ * only the stake presidency proposes/approves and the high council votes,
+ * the same pairing that already reviews stake-level callings. There is no
+ * bishop-side interview/extend/accept/set-apart phase, so this is a
+ * shorter ladder than CallingWorkflow's.
+ */
+export type PriesthoodAdvancementType = 'priest_to_elder' | 'elder_to_high_priest';
+
+export const ADVANCEMENT_OFFICES: Record<
+  PriesthoodAdvancementType,
+  { from: string; to: string }
+> = {
+  priest_to_elder: { from: 'Priest', to: 'Elder' },
+  elder_to_high_priest: { from: 'Elder', to: 'High Priest' },
+};
+
+export const ADVANCEMENT_TYPE_LABELS: Record<PriesthoodAdvancementType, string> = {
+  priest_to_elder: 'Priest → Elder',
+  elder_to_high_priest: 'Elder → High Priest',
+};
+
+export type AdvancementStatus =
+  | 'proposed'
+  | 'presidency_approved'
+  | 'high_council_approved'
+  | 'ordained'
+  | 'recorded_in_lcr'
+  | 'complete';
+
+export const ADVANCEMENT_STATUS_ORDER: AdvancementStatus[] = [
+  'proposed',
+  'presidency_approved',
+  'high_council_approved',
+  'ordained',
+  'recorded_in_lcr',
+  'complete',
+];
+
+export const ADVANCEMENT_STATUS_LABELS: Record<AdvancementStatus, string> = {
+  proposed: 'Proposed',
+  presidency_approved: 'Stake Presidency Approved',
+  high_council_approved: 'High Council Approved',
+  ordained: 'Ordained',
+  recorded_in_lcr: 'Recorded in LCR',
+  complete: 'Complete',
+};
+
+/** priesthoodAdvancements/{id} */
+export interface PriesthoodAdvancementWorkflow {
+  id: string;
+  advancementType: PriesthoodAdvancementType;
+  personId: string;
+  personName: string; // denormalized for list display
+  /** Ward or branch unit number; omitted for a stake-level record. */
+  unit?: string;
+  status: AdvancementStatus;
+  proposedDate?: Timestamp;
+  presidencyApprovedDate?: Timestamp;
+  highCouncilApprovedDate?: Timestamp;
+  ordainedDate?: Timestamp;
+  recordedDate?: Timestamp;
+  completedDate?: Timestamp;
+  /** Display name of who performed the ordination. Set when the workflow
+   *  advances to `ordained`; optional, free text - there's no fixed
+   *  authority list for this the way calling-authorities.ts has one for
+   *  callings. */
+  ordainedBy?: string;
+  /**
+   * UIDs of High Council members who have voted to approve this workflow
+   * while it sits at `presidency_approved`. Same semantics as
+   * CallingWorkflow.hcApprovalUids - see core/hc-review.ts and
+   * core/advancement-review.ts.
+   */
+  hcApprovalUids?: string[];
+  /** Same semantics as CallingWorkflow.hcConcernUids. */
+  hcConcernUids?: string[];
+  /** Snapshotted quorum threshold - see core/quorum.ts. */
+  hcRequired?: number;
+  notes?: string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+/** priesthoodAdvancements/{id}/history/{historyId} - audit trail */
+export interface AdvancementHistoryEntry {
+  id: string;
+  status: string;
+  changedBy: string;
+  changedByName: string;
+  changedAt?: Timestamp;
+  note?: string;
+  kind?: HistoryEntryKind;
+}

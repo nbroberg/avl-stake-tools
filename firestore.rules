@@ -179,6 +179,31 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
+    // priesthoodAdvancements - Priest->Elder / Elder->High Priest workflow
+    // tracking + audit history subcollection. Bishop is not part of this
+    // flow (for now) - only stake presidency and high council touch it,
+    // so the rule shape is identical to callingWorkflows above and reuses
+    // the same isHighCouncilSelfVote()/isHighCouncilQuorumAdvance()
+    // helpers verbatim (both read only `resource`/`request.resource` of
+    // whichever document is actually being written).
+    // ---------------------------------------------------------------------
+    match /priesthoodAdvancements/{advancementId} {
+      allow read: if isAnyApprovedUser();
+      allow create: if isPresidency();
+      allow delete: if isPresidency();
+
+      allow update: if isPresidency()
+        || (isHighCouncil()
+            && (isHighCouncilSelfVote() || isHighCouncilQuorumAdvance()));
+
+      match /history/{entryId} {
+        allow read: if isAnyApprovedUser();
+        allow create: if isPresidency() || isHighCouncil();
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------------
     // diagnostics - lightweight per-user connectivity ping, no app data.
     // Any authenticated user may use this, even before being approved, so
     // connectivity from a meetinghouse network can be verified before role

@@ -1,10 +1,12 @@
 import { Timestamp } from 'firebase/firestore';
 import { HC_QUORUM_REQUIRED } from '../quorum';
 import type {
+  AdvancementHistoryEntry,
   AppUser,
   CallingStatusHistoryEntry,
   CallingWorkflow,
   Person,
+  PriesthoodAdvancementWorkflow,
 } from '../../models/types';
 
 /**
@@ -443,4 +445,137 @@ export function demoHistory(workflow: CallingWorkflow): CallingStatusHistoryEntr
 
 function daysSince(ts: Timestamp): number {
   return Math.max(0, Math.round((Date.now() - ts.toDate().getTime()) / 86_400_000));
+}
+
+interface AdvancementSeed {
+  id: string;
+  advancementType: PriesthoodAdvancementWorkflow['advancementType'];
+  personName: string;
+  unit?: string;
+  status: string;
+  ageDays: number;
+  hcApprovals?: number;
+  hcConcerns?: number;
+  ordainedBy?: string;
+  notes?: string;
+}
+
+/**
+ * One advancement parked at each interesting point in the (shorter,
+ * bishop-free) ladder, mirroring WORKFLOW_SEEDS above: a fresh proposal,
+ * one mid high-council-vote, and one already complete.
+ */
+const ADVANCEMENT_SEEDS: AdvancementSeed[] = [
+  {
+    id: 'adv-priest-mbeki',
+    advancementType: 'priest_to_elder',
+    personName: 'Ignatius Mbeki',
+    unit: NORTHGATE,
+    status: 'proposed',
+    ageDays: 3,
+    notes: 'Discussed with the elders quorum presidency; ready for interview.',
+  },
+  {
+    // Sits exactly on the high council vote, two short of quorum, so
+    // switching the demo role to High Council and approving moves the
+    // count visibly - same setup as wf-rs-2nd-counselor above.
+    id: 'adv-elder-berkowitz',
+    advancementType: 'elder_to_high_priest',
+    personName: 'Isaac Berkowitz',
+    unit: NORTHGATE,
+    status: 'presidency_approved',
+    ageDays: 8,
+    hcApprovals: 7,
+  },
+  {
+    id: 'adv-elder-sorensen',
+    advancementType: 'elder_to_high_priest',
+    personName: 'Grant Sorensen',
+    unit: NORTHGATE,
+    status: 'complete',
+    ageDays: 60,
+    ordainedBy: 'Daniel Okafor',
+  },
+];
+
+export function demoAdvancementWorkflows(): PriesthoodAdvancementWorkflow[] {
+  const people = demoPeople();
+  return ADVANCEMENT_SEEDS.map((s) => {
+    const person = people.find((p) => p.name === s.personName);
+    return {
+      id: s.id,
+      advancementType: s.advancementType,
+      personId: person?.id ?? slugify(s.personName),
+      personName: s.personName,
+      unit: s.unit,
+      status: s.status as PriesthoodAdvancementWorkflow['status'],
+      proposedDate: daysAgo(s.ageDays),
+      ordainedBy: s.ordainedBy,
+      hcApprovalUids: Array.from({ length: s.hcApprovals ?? 0 }, (_, i) => `demo-hc-${i + 1}`),
+      hcConcernUids: Array.from(
+        { length: s.hcConcerns ?? 0 },
+        (_, i) => `demo-hc-${(s.hcApprovals ?? 0) + i + 1}`,
+      ),
+      hcRequired: HC_QUORUM_REQUIRED,
+      notes: s.notes,
+      createdBy: 'demo-user',
+      updatedBy: 'demo-user',
+      createdAt: daysAgo(s.ageDays),
+      updatedAt: daysAgo(Math.max(0, s.ageDays - 2)),
+    } satisfies PriesthoodAdvancementWorkflow;
+  });
+}
+
+/** Seed audit trail for an advancement - same shape and rationale as
+ *  demoHistory() above. */
+export function demoAdvancementHistory(
+  workflow: PriesthoodAdvancementWorkflow,
+): AdvancementHistoryEntry[] {
+  const age = workflow.createdAt ? daysSince(workflow.createdAt) : 7;
+  const entries: AdvancementHistoryEntry[] = [
+    {
+      id: `${workflow.id}-h0`,
+      status: 'proposed',
+      changedBy: 'demo-user',
+      changedByName: 'Marcus Whitfield',
+      changedAt: daysAgo(age),
+      note: 'Workflow created.',
+    },
+  ];
+
+  if (workflow.status !== 'proposed') {
+    entries.push({
+      id: `${workflow.id}-h1`,
+      status: workflow.status,
+      changedBy: 'demo-user',
+      changedByName: 'Daniel Okafor',
+      changedAt: daysAgo(Math.max(0, age - 3)),
+    });
+  }
+
+  for (const [i, uid] of (workflow.hcApprovalUids ?? []).entries()) {
+    entries.push({
+      id: `${workflow.id}-hc${i}`,
+      status: 'presidency_approved',
+      changedBy: uid,
+      changedByName: councilorName(uid),
+      changedAt: daysAgo(Math.max(0, age - 4)),
+      kind: 'hc_approval',
+      note: 'High Council approval recorded.',
+    });
+  }
+
+  for (const [i, uid] of (workflow.hcConcernUids ?? []).entries()) {
+    entries.push({
+      id: `${workflow.id}-hcc${i}`,
+      status: 'presidency_approved',
+      changedBy: uid,
+      changedByName: councilorName(uid),
+      changedAt: daysAgo(Math.max(0, age - 5)),
+      kind: 'hc_concern',
+      note: 'High Council concern raised.',
+    });
+  }
+
+  return entries;
 }
