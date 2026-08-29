@@ -18,6 +18,7 @@ import { Observable } from 'rxjs';
 import { db } from './firebase';
 import { DATE_FIELD_BY_STATUS } from './calling-status';
 import { HC_QUORUM_REQUIRED } from './quorum';
+import { completesSustaining } from './sunday-visit';
 import type {
   AppUser,
   CallingStatus,
@@ -179,13 +180,33 @@ export class CallingsService {
    * (see CallingWorkflow.sustainedInUnits) - the UI only offers this for
    * stake-wide callings/releases, but nothing here re-checks that, since
    * marking a unit on a ward-level workflow is harmless, just unused.
+   *
+   * When this unit is the last one needed (core/sunday-visit.ts's
+   * completesSustaining), the status advances to `sustained` in the same
+   * write - the caller doesn't need a separate "now click advance"
+   * step once the checklist fills up.
    */
-  async markUnitSustained(workflowId: string, unitNumber: string, actor: AppUser): Promise<void> {
-    await updateDoc(doc(db, COLLECTION, workflowId), {
+  async markUnitSustained(
+    workflow: Pick<CallingWorkflow, 'id' | 'unit' | 'sustainedInUnits'>,
+    unitNumber: string,
+    actor: AppUser,
+  ): Promise<void> {
+    const complete = completesSustaining(workflow, unitNumber);
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
       sustainedInUnits: arrayUnion(unitNumber),
+      ...(complete ? { status: 'sustained', sustainedDate: serverTimestamp() } : {}),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
     });
+    if (complete) {
+      await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+        status: 'sustained',
+        changedBy: actor.firebaseUid,
+        changedByName: actor.displayName,
+        changedAt: serverTimestamp(),
+        note: 'Sustained in every unit.',
+      });
+    }
   }
 
   /** Undo a mis-click - removes one unit from the sustained-in list. */
@@ -194,6 +215,37 @@ export class CallingsService {
       sustainedInUnits: arrayRemove(unitNumber),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
+    });
+  }
+
+  /**
+   * Sustain and set apart in one write - used when the person being
+   * released or called is physically present with the presidency member
+   * or high councilor right as the sustaining completes (see
+   * core/sunday-visit.ts's canCombineSustainAndSetApart). For a
+   * stake-wide workflow this also folds in the completing unit mark;
+   * ward/branch workflows have no checklist, so `unitNumber` is omitted.
+   */
+  async sustainAndSetApart(
+    workflow: Pick<CallingWorkflow, 'id'>,
+    unitNumber: string | undefined,
+    actor: AppUser,
+  ): Promise<void> {
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status: 'set_apart',
+      sustainedDate: serverTimestamp(),
+      setApartDate: serverTimestamp(),
+      setApartBy: actor.displayName,
+      ...(unitNumber ? { sustainedInUnits: arrayUnion(unitNumber) } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status: 'set_apart',
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: `Sustained and set apart by ${actor.displayName} in the same visit.`,
     });
   }
 

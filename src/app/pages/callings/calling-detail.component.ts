@@ -285,25 +285,36 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
               }
               @if (s === 'set_apart') {
                 <div class="field">
-                  <label>Set apart by (optional)</label>
-                  @if (eligibleExtenders().length > 0) {
-                    <select
-                      [ngModel]="pendingSetApartBy()"
-                      (ngModelChange)="pendingSetApartBy.set($event)"
-                    >
-                      <option value="">— unspecified —</option>
-                      @for (p of eligibleExtenders(); track p.id) {
-                        <option [value]="p.name">
-                          {{ p.name }} — {{ eligibilityLabel(p) }}
-                        </option>
-                      }
-                    </select>
+                  @if (isHighCouncil(authService.appUser())) {
+                    <!-- Firestore rules only let a high councilor record
+                         set_apart with their OWN recorded name - they
+                         can't attribute it to anyone else - so there's
+                         nothing to pick here. -->
+                    <label>Set apart by</label>
+                    <p class="text-sm" style="margin: 0">
+                      You, {{ authService.appUser()?.displayName }}.
+                    </p>
                   } @else {
-                    <input
-                      [ngModel]="pendingSetApartBy()"
-                      (ngModelChange)="pendingSetApartBy.set($event)"
-                      placeholder="Name (optional)"
-                    />
+                    <label>Set apart by (optional)</label>
+                    @if (eligibleExtenders().length > 0) {
+                      <select
+                        [ngModel]="pendingSetApartBy()"
+                        (ngModelChange)="pendingSetApartBy.set($event)"
+                      >
+                        <option value="">— unspecified —</option>
+                        @for (p of eligibleExtenders(); track p.id) {
+                          <option [value]="p.name">
+                            {{ p.name }} — {{ eligibilityLabel(p) }}
+                          </option>
+                        }
+                      </select>
+                    } @else {
+                      <input
+                        [ngModel]="pendingSetApartBy()"
+                        (ngModelChange)="pendingSetApartBy.set($event)"
+                        placeholder="Name (optional)"
+                      />
+                    }
                   }
                 </div>
               }
@@ -648,7 +659,7 @@ export class CallingDetailComponent {
     this.busy.set(true);
     try {
       if (checked) {
-        await this.callingsService.markUnitSustained(w.id, unitNumber, actor);
+        await this.callingsService.markUnitSustained(w, unitNumber, actor);
       } else {
         await this.callingsService.unmarkUnitSustained(w.id, unitNumber, actor);
       }
@@ -689,7 +700,15 @@ export class CallingDetailComponent {
     this.busy.set(true);
     try {
       const assignedTo = status === 'interview_assigned' ? this.pendingAssignee().trim() : undefined;
-      const setApartBy = status === 'set_apart' ? this.pendingSetApartBy().trim() : undefined;
+      // Firestore rules require a high councilor's setApartBy to be their
+      // own recorded name - enforced here too, not just hidden in the
+      // template, so this can't drift out of sync with firestore.rules.
+      const setApartBy =
+        status === 'set_apart'
+          ? isHighCouncil(actor)
+            ? actor.displayName
+            : this.pendingSetApartBy().trim()
+          : undefined;
       await this.callingsService.advanceStatus(w, status, actor, { assignedTo, setApartBy });
       this.pendingAssignee.set('');
       this.pendingSetApartBy.set('');

@@ -16,9 +16,13 @@ rules_version = '2';
 //   callingWorkflows, and every calling-status transition.
 // - High council reads everything, and may only: record their own
 //   position (approve / withdraw / raise a concern / clear it) on a
-//   workflow at `presidency_approved`, and advance that workflow to
+//   workflow at `presidency_approved`; advance that workflow to
 //   `high_council_approved` once quorum is met with no concern
-//   outstanding. No other writes.
+//   outstanding; and, from a unit visit on a Sunday, mark a unit
+//   sustained, sustain a calling/release (optionally combined with
+//   setting the person apart in the same visit), or set someone apart
+//   on its own. No other writes - see isHighCouncilMarkSustainedUnit,
+//   isHighCouncilSustain, and isHighCouncilSetApart below.
 //
 // Users cannot elevate themselves - the users collection is not writable
 // from the app; the first admin adds subsequent user docs via the
@@ -90,14 +94,20 @@ service cloud.firestore {
       allow create: if isPresidency();
       allow delete: if isPresidency();
 
-      // Presidency can update anything. High Council can do two things
+      // Presidency can update anything. High Council can do these things
       // and nothing else: record their own position on a workflow sitting
       // at `presidency_approved` (approve, withdraw, raise or clear a
-      // concern), and advance the status once quorum is met with no
-      // concern outstanding.
+      // concern); advance the status once quorum is met with no concern
+      // outstanding; and, while physically visiting a unit on a Sunday,
+      // mark a unit sustained, sustain (optionally combined with setting
+      // apart in the same visit), or set apart on its own.
       allow update: if isPresidency()
         || (isHighCouncil()
-            && (isHighCouncilSelfVote() || isHighCouncilQuorumAdvance()));
+            && (isHighCouncilSelfVote()
+                || isHighCouncilQuorumAdvance()
+                || isHighCouncilMarkSustainedUnit()
+                || isHighCouncilSustain()
+                || isHighCouncilSetApart()));
 
       match /history/{entryId} {
         allow read: if isAnyApprovedUser();
@@ -176,6 +186,61 @@ service cloud.firestore {
         && resource.data.get('hcConcernUids', []).size() == 0
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'updatedAt', 'updatedBy', 'highCouncilApprovedDate']);
+    }
+
+    /**
+     * A high councilor (or presidency member, via their own unconditional
+     * path) recording that a unit has sustained a stake-wide calling,
+     * without yet advancing the status - the ordinary case while other
+     * units still haven't weighed in. Ward/branch workflows don't use
+     * this shape; their one unit's sustaining always finishes them (see
+     * isHighCouncilSustain below), so there's no "partial" state to
+     * record.
+     */
+    function isHighCouncilMarkSustainedUnit() {
+      return isHighCouncil()
+        && (resource.data.status == 'accepted' || resource.data.status == 'released')
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['sustainedInUnits', 'updatedAt', 'updatedBy']);
+    }
+
+    /**
+     * A high councilor completing the sustaining during a unit visit -
+     * either the ordinary "sustained here" case, or the same visit also
+     * setting the person apart because the councilor is physically
+     * present with them (core/sunday-visit.ts decides which on the
+     * client; here we just accept either resulting status). Covers both
+     * the calling ladder (accepted -> ...) and the release ladder
+     * (released -> ...). setApartBy, when present, must be the caller's
+     * own recorded name - they can't attribute the act to anyone else.
+     */
+    function isHighCouncilSustain() {
+      return isHighCouncil()
+        && (resource.data.status == 'accepted' || resource.data.status == 'released')
+        && (request.resource.data.status == 'sustained'
+            || request.resource.data.status == 'set_apart')
+        && (request.resource.data.status != 'set_apart'
+            || request.resource.data.get('setApartBy', '') == callerDoc().data.displayName)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly([
+               'status', 'sustainedDate', 'setApartDate', 'setApartBy',
+               'sustainedInUnits', 'updatedAt', 'updatedBy',
+             ]);
+    }
+
+    /**
+     * A high councilor setting a person apart on a later visit, after the
+     * calling was already sustained (possibly by someone else, on an
+     * earlier visit). Same own-name restriction as isHighCouncilSustain.
+     */
+    function isHighCouncilSetApart() {
+      return isHighCouncil()
+        && resource.data.status == 'sustained'
+        && request.resource.data.status == 'set_apart'
+        && request.resource.data.get('setApartBy', '') == callerDoc().data.displayName
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'setApartDate', 'setApartBy', 'updatedAt', 'updatedBy']);
     }
 
     // ---------------------------------------------------------------------

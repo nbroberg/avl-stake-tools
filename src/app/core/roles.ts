@@ -38,7 +38,13 @@ export function canEditNotes(user: AppUser | null): boolean {
 /**
  * Whether the caller may advance a workflow from `from` to `to`.
  * - Presidency: any legal transition.
- * - High Council: only presidency_approved -> high_council_approved.
+ * - High Council: presidency_approved -> high_council_approved (their
+ *   vote), and the sustaining/setting-apart steps a councilor performs
+ *   in person while visiting a unit on a Sunday - accepted/released ->
+ *   sustained, accepted/released -> set_apart (sustained and set apart
+ *   in the same visit), and sustained -> set_apart (set apart on a
+ *   later visit). See core/sunday-visit.ts for the presence rule that
+ *   decides which of those a given workflow is eligible for.
  * The legality of `from -> to` itself is checked separately via
  * getNextStatuses(); this helper only enforces the ROLE-based scoping.
  */
@@ -49,7 +55,11 @@ export function canAdvanceStatus(
 ): boolean {
   if (isPresidency(user)) return true;
   if (isHighCouncil(user)) {
-    return from === 'presidency_approved' && to === 'high_council_approved';
+    if (from === 'presidency_approved' && to === 'high_council_approved') return true;
+    if ((from === 'accepted' || from === 'released') && (to === 'sustained' || to === 'set_apart')) {
+      return true;
+    }
+    if (from === 'sustained' && to === 'set_apart') return true;
   }
   return false;
 }
