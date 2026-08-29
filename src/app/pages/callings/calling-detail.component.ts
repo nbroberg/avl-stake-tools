@@ -467,9 +467,17 @@ export class CallingDetailComponent {
     return w ? authoritiesFor(w.callingName) : null;
   });
 
+  /**
+   * Releases never pass through `high_council_approved` - the release
+   * ladder (RELEASE_STATUS_ORDER) skips straight from presidency approval
+   * to extending the release, since the high council only weighs in on
+   * who gets called, not who gets released. Gate on workflowType here
+   * rather than only on the calling's approval body, or a release of an
+   * HC-approved calling would wrongly show the vote card.
+   */
   protected readonly needsHcApproval = computed(() => {
     const w = this.workflow();
-    return !!w && requiresHighCouncilApproval(w.callingName);
+    return !!w && w.workflowType !== 'release' && requiresHighCouncilApproval(w.callingName);
   });
 
   protected readonly externalApproval = computed(() => {
