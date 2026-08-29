@@ -98,12 +98,13 @@ const ADVANCEMENT_TYPES: PriesthoodAdvancementType[] = ['priest_to_elder', 'elde
   styles: [
     `
       .candidate-list {
+        /* No internal scroll here - a capped-height, independently
+           scrolling list nested inside the page's own scroll reads as
+           two competing scrollbars on mobile. The list grows to its full
+           natural height instead, so the one scroll gesture that moves
+           the page also moves through the candidates. */
         display: flex;
         flex-direction: column;
-        max-height: min(24rem, 60dvh);
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
         border: 1px solid var(--border);
         border-radius: 8px;
         background: var(--surface);
@@ -115,7 +116,6 @@ const ADVANCEMENT_TYPES: PriesthoodAdvancementType[] = ['priest_to_elder', 'elde
         gap: 0.7rem;
         padding: 0.85rem 0.75rem;
         min-height: var(--tap);
-        flex-shrink: 0;
         border-top: 1px solid rgba(26, 39, 51, 0.14);
         cursor: pointer;
         touch-action: manipulation;

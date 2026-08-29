@@ -277,15 +277,13 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
   styles: [
     `
       .candidate-list {
+        /* No internal scroll here - a capped-height, independently
+           scrolling list nested inside the page's own scroll reads as
+           two competing scrollbars on mobile. The list grows to its full
+           natural height instead, so the one scroll gesture that moves
+           the page also moves through the candidates. */
         display: flex;
         flex-direction: column;
-        /* Cap against the viewport rather than a fixed 24rem: on a phone in
-           landscape 24rem is taller than the screen, which traps the page
-           scroll inside this list. */
-        max-height: min(24rem, 60dvh);
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
         border: 1px solid var(--border);
         border-radius: 8px;
         background: var(--surface);
@@ -298,15 +296,6 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         padding: 0.85rem 0.75rem;
         /* The whole row is the tap target for the radio inside it. */
         min-height: var(--tap);
-        /* .candidate-list is a flex column with a capped max-height and
-           overflow-y: auto for scrolling. Without flex-shrink: 0, once
-           the rows' combined natural height exceeds that cap, flexbox
-           shrinks every row toward its min-height *before* falling back
-           to scroll - so every row got clamped to exactly var(--tap) and
-           its text (candidate-body, overflow: visible) spilled silently
-           into the row below. This keeps rows at their content height and
-           lets the list scroll instead. */
-        flex-shrink: 0;
         border-top: 1px solid rgba(26, 39, 51, 0.14);
         cursor: pointer;
         touch-action: manipulation;
