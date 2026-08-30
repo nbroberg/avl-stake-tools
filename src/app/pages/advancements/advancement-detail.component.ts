@@ -4,11 +4,17 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { map, of, switchMap } from 'rxjs';
 import { PriesthoodAdvancementsService } from '../../core/priesthood-advancements.service';
+import { PeopleService } from '../../core/people.service';
 import { formatTimestamp } from '../../core/calling-status';
 import { getNextStatuses } from '../../core/advancement-status';
 import { canAdvanceStatus, canEditNotes, isHighCouncil, isPresidency } from '../../core/roles';
 import { namesFor, tally } from '../../core/advancement-review';
-import { workflowScopeLabel } from '../../core/units';
+import {
+  personSatisfiesPriesthood,
+  PRIESTHOOD_REQUIREMENT_LABELS,
+  type PriesthoodRequirement,
+} from '../../core/calling-authorities';
+import { unitLabel, workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';
 import { StatusBadgeComponent } from '../../shared/status-badge.component';
@@ -16,6 +22,7 @@ import {
   ADVANCEMENT_STATUS_LABELS,
   ADVANCEMENT_TYPE_LABELS,
   type AppUser,
+  type Person,
   type PriesthoodAdvancementWorkflow,
 } from '../../models/types';
 
@@ -144,11 +151,53 @@ import {
                     </p>
                   } @else {
                     <label>Ordained by (optional)</label>
-                    <input
-                      [ngModel]="pendingOrdainedBy()"
-                      (ngModelChange)="pendingOrdainedBy.set($event)"
-                      placeholder="e.g. President Whitfield"
-                    />
+                    @if (pendingOrdainedBy()) {
+                      <p class="text-sm" style="margin: 0">
+                        <strong>{{ pendingOrdainedBy() }}</strong>
+                        <button
+                          type="button"
+                          class="btn"
+                          style="margin-left: 0.5rem; padding: 0.15rem 0.6rem"
+                          (click)="clearOrdainedBy()"
+                        >
+                          Change
+                        </button>
+                      </p>
+                    } @else {
+                      <input
+                        type="search"
+                        [ngModel]="ordainedByQuery()"
+                        (ngModelChange)="ordainedByQuery.set($event)"
+                        placeholder="Search by name…"
+                        aria-label="Search for who performed the ordination"
+                      />
+                      @if (ordainedByQuery().trim()) {
+                        @if (searchedOrdainers().length > 0) {
+                          <div class="candidate-list" role="radiogroup" aria-label="Select who performed the ordination">
+                            @for (p of searchedOrdainers(); track p.id) {
+                              <label class="candidate">
+                                <input
+                                  type="radio"
+                                  name="ordainedBy"
+                                  [value]="p.id"
+                                  (change)="pendingOrdainedBy.set(p.name)"
+                                />
+                                <span class="candidate-body">
+                                  <span class="candidate-name">{{ p.name }}</span>
+                                  <span class="candidate-meta">{{ unitLabel(p.unit) }} &middot; {{ p.priesthoodOffice }}</span>
+                                </span>
+                              </label>
+                            }
+                          </div>
+                        } @else {
+                          <span class="text-sm muted">No one matches "{{ ordainedByQuery().trim() }}".</span>
+                        }
+                      }
+                      <span class="text-sm muted">
+                        Requires {{ ordainerRequirementLabel() }} on record. If they aren't in the
+                        stake, leave this blank and note who performed the ordination below instead.
+                      </span>
+                    }
                   }
                 </div>
               }
@@ -244,6 +293,40 @@ import {
       @media (max-width: 639.98px) {
         .history .note-empty { display: none; }
       }
+      .candidate-list {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      .candidate {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: start;
+        gap: 0.7rem;
+        padding: 0.6rem 0.75rem;
+        min-height: var(--tap);
+        border-top: 1px solid rgba(26, 39, 51, 0.14);
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      .candidate:first-child { border-top: none; }
+      @media (hover: hover) {
+        .candidate:hover { background: var(--bg); }
+      }
+      .candidate:active { background: var(--bg); }
+      .candidate input[type='radio'] { margin-top: 0.15rem; }
+      .candidate-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        min-width: 0;
+      }
+      .candidate-name { font-weight: 500; color: var(--text); line-height: 1.3; }
+      .candidate-meta { font-size: 0.75rem; color: var(--muted); line-height: 1.3; }
     `,
   ],
 })
@@ -260,9 +343,11 @@ export class AdvancementDetailComponent {
   protected readonly typeLabels = ADVANCEMENT_TYPE_LABELS;
   protected readonly formatTimestamp = formatTimestamp;
   protected readonly hcTotal = HC_TOTAL;
+  protected readonly unitLabel = unitLabel;
 
   private readonly route = inject(ActivatedRoute);
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
+  private readonly peopleService = inject(PeopleService);
 
   private readonly id = toSignal(this.route.paramMap.pipe(map((params) => params.get('id'))), {
     initialValue: this.route.snapshot.paramMap.get('id'),
@@ -272,9 +357,48 @@ export class AdvancementDetailComponent {
     initialValue: [] as PriesthoodAdvancementWorkflow[],
   });
 
+  private readonly people = toSignal(this.peopleService.list(), { initialValue: [] as Person[] });
+
   protected readonly workflow = computed(
     () => this.workflows().find((w) => w.id === this.id()) ?? null,
   );
+
+  /**
+   * Who's allowed to have performed this ordination - an Elder or High
+   * Priest for Priest -> Elder (either already outranks a Priest), a High
+   * Priest only for Elder -> High Priest. Drives both the search pool
+   * below and the hint text next to it.
+   */
+  protected readonly ordainerRequirement = computed<PriesthoodRequirement>(() =>
+    this.workflow()?.advancementType === 'priest_to_elder' ? 'melchizedek' : 'high_priest',
+  );
+
+  protected readonly ordainerRequirementLabel = computed(
+    () => PRIESTHOOD_REQUIREMENT_LABELS[this.ordainerRequirement()],
+  );
+
+  private readonly eligibleOrdainers = computed(() => {
+    const req = this.ordainerRequirement();
+    return this.people()
+      .filter((p) => personSatisfiesPriesthood(p.priesthoodOffice, req))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  protected readonly ordainedByQuery = signal('');
+
+  /**
+   * Empty until a name is typed - the eligible pool can run into the
+   * hundreds stake-wide, so this is a search, not a browsable list (see
+   * new-advancement.component.ts's eligiblePeople for the contrast: that
+   * pool is usually small enough to browse unsearched).
+   */
+  protected readonly searchedOrdainers = computed(() => {
+    const q = this.ordainedByQuery().trim().toLowerCase();
+    if (!q) return [];
+    return this.eligibleOrdainers()
+      .filter((p) => p.name.toLowerCase().includes(q))
+      .slice(0, 20);
+  });
 
   protected readonly nextStatuses = computed(() => {
     const w = this.workflow();
@@ -362,9 +486,15 @@ export class AdvancementDetailComponent {
           : undefined;
       await this.advancementsService.advanceStatus(w, status, actor, { ordainedBy });
       this.pendingOrdainedBy.set('');
+      this.ordainedByQuery.set('');
     } finally {
       this.busy.set(false);
     }
+  }
+
+  clearOrdainedBy(): void {
+    this.pendingOrdainedBy.set('');
+    this.ordainedByQuery.set('');
   }
 
   startApprove(): void {

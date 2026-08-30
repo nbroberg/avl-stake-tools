@@ -6,7 +6,7 @@ import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PeopleService } from '../core/people.service';
 import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
-import { canAdvanceStatus } from '../core/roles';
+import { canAdvanceStatus, isHighCouncil } from '../core/roles';
 import {
   canCombineSustainAndSetApart,
   isPersonPresentInUnit,
@@ -159,12 +159,23 @@ import {
                 <a [routerLink]="['/advancements', row.workflow.id]">{{ row.workflow.personName }}</a>
                 <span class="muted"> — {{ advancementTypeLabels[row.workflow.advancementType] }}</span>
               </div>
-              @if (row.canAct) {
-                <button class="btn btn-primary" [disabled]="busy()" (click)="ordain(row.workflow)">
-                  Ordain
-                </button>
+              @if (isHighCouncil(authService.appUser())) {
+                @if (row.canAct) {
+                  <button class="btn btn-primary" [disabled]="busy()" (click)="ordain(row.workflow)">
+                    Ordain
+                  </button>
+                } @else {
+                  <span class="text-sm muted">Only the presidency or high council can record this.</span>
+                }
               } @else {
-                <span class="text-sm muted">Only the presidency or high council can record this.</span>
+                <!-- The person who actually performs an ordination is
+                     often a family member, not whoever's recording it -
+                     the detail page's search picker handles that; a
+                     one-click self-attributed button here would be wrong
+                     most of the time. -->
+                <a class="btn" [routerLink]="['/advancements', row.workflow.id]">
+                  Record ordination
+                </a>
               }
             </div>
           }
@@ -187,6 +198,7 @@ export class SundayVisitComponent {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly advancementTypeLabels = ADVANCEMENT_TYPE_LABELS;
+  protected readonly isHighCouncil = isHighCouncil;
   protected readonly stakeUnitsList = stakeUnits();
   // Pre-selected from the dashboard's per-unit outstanding summary
   // (?unit=<number>) so a tap there lands here already filtered.
