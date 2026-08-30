@@ -20,9 +20,10 @@ rules_version = '2';
 //   `high_council_approved` once quorum is met with no concern
 //   outstanding; and, from a unit visit on a Sunday, mark a unit
 //   sustained, sustain a calling/release (optionally combined with
-//   setting the person apart in the same visit), or set someone apart
-//   on its own. No other writes - see isHighCouncilMarkSustainedUnit,
-//   isHighCouncilSustain, and isHighCouncilSetApart below.
+//   setting the person apart in the same visit), set someone apart on
+//   its own, or record a priesthood ordination they performed. No other
+//   writes - see isHighCouncilMarkSustainedUnit, isHighCouncilSustain,
+//   isHighCouncilSetApart, and isHighCouncilOrdain below.
 //
 // Users cannot elevate themselves - the users collection is not writable
 // from the app; the first admin adds subsequent user docs via the
@@ -257,15 +258,33 @@ service cloud.firestore {
       allow create: if isPresidency();
       allow delete: if isPresidency();
 
+      // Also lets a high councilor record an ordination performed during
+      // a unit visit on a Sunday, same own-name restriction as setting
+      // apart on callingWorkflows above.
       allow update: if isPresidency()
         || (isHighCouncil()
-            && (isHighCouncilSelfVote() || isHighCouncilQuorumAdvance()));
+            && (isHighCouncilSelfVote() || isHighCouncilQuorumAdvance() || isHighCouncilOrdain()));
 
       match /history/{entryId} {
         allow read: if isAnyApprovedUser();
         allow create: if isPresidency() || isHighCouncil();
         allow update, delete: if false;
       }
+    }
+
+    /**
+     * A high councilor recording a priesthood ordination they performed
+     * on a unit visit. Same own-name restriction as isHighCouncilSetApart
+     * on callingWorkflows - they can't attribute the ordination to
+     * anyone else.
+     */
+    function isHighCouncilOrdain() {
+      return isHighCouncil()
+        && resource.data.status == 'high_council_approved'
+        && request.resource.data.status == 'ordained'
+        && request.resource.data.get('ordainedBy', '') == callerDoc().data.displayName
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'ordainedDate', 'ordainedBy', 'updatedAt', 'updatedBy']);
     }
 
     // ---------------------------------------------------------------------

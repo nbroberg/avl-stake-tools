@@ -5,26 +5,35 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PeopleService } from '../core/people.service';
+import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
 import { canAdvanceStatus } from '../core/roles';
 import {
   canCombineSustainAndSetApart,
   isPersonPresentInUnit,
+  needsOrdination,
   needsSetApart,
   needsSustaining,
   needsSustainingIn,
 } from '../core/sunday-visit';
 import { stakeUnits } from '../core/units';
-import type { CallingWorkflow, Person } from '../models/types';
+import {
+  ADVANCEMENT_TYPE_LABELS,
+  type CallingWorkflow,
+  type Person,
+  type PriesthoodAdvancementWorkflow,
+} from '../models/types';
 
 /**
  * A councilor or presidency member picks the unit they're attending this
- * Sunday and sees exactly three things for it: new callings that still
- * need sustaining, releases that still need their vote of thanks, and
- * who's ready to be set apart. Sustaining and setting apart get offered
- * as one action for a calling whenever this visit is both the last unit
- * a stake-wide calling needs and the room the person is actually in -
- * see core/sunday-visit.ts for that rule. Releases never combine with
- * setting apart - there's no such phase for a release. Everything else
+ * Sunday and sees exactly four things for it: new callings that still
+ * need sustaining, releases that still need their vote of thanks, who's
+ * ready to be set apart, and priesthood advancements ready for
+ * ordination. Sustaining and setting apart get offered as one action for
+ * a calling whenever this visit is both the last unit a stake-wide
+ * calling needs and the room the person is actually in - see
+ * core/sunday-visit.ts for that rule. Releases never combine with
+ * setting apart, and ordinations never combine with anything - there's
+ * no sustaining step for a priesthood advancement. Everything else
  * (proposing callings, HC votes, notes) stays on the workflow detail
  * page; this view exists only to answer "what do I do here today."
  */
@@ -138,6 +147,28 @@ import type { CallingWorkflow, Person } from '../models/types';
             </div>
           }
         </div>
+
+        <div class="card stack">
+          <strong>Ordinations pending</strong>
+          @if (pendingOrdinations().length === 0) {
+            <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
+          }
+          @for (row of pendingOrdinations(); track row.workflow.id) {
+            <div class="row-between sunday-row">
+              <div>
+                <a [routerLink]="['/advancements', row.workflow.id]">{{ row.workflow.personName }}</a>
+                <span class="muted"> — {{ advancementTypeLabels[row.workflow.advancementType] }}</span>
+              </div>
+              @if (row.canAct) {
+                <button class="btn btn-primary" [disabled]="busy()" (click)="ordain(row.workflow)">
+                  Ordain
+                </button>
+              } @else {
+                <span class="text-sm muted">Only the presidency or high council can record this.</span>
+              }
+            </div>
+          }
+        </div>
       }
     </div>
   `,
@@ -152,8 +183,10 @@ export class SundayVisitComponent {
   protected readonly authService = inject(AuthService);
   private readonly callingsService = inject(CallingsService);
   private readonly peopleService = inject(PeopleService);
+  private readonly advancementsService = inject(PriesthoodAdvancementsService);
   private readonly route = inject(ActivatedRoute);
 
+  protected readonly advancementTypeLabels = ADVANCEMENT_TYPE_LABELS;
   protected readonly stakeUnitsList = stakeUnits();
   // Pre-selected from the dashboard's per-unit outstanding summary
   // (?unit=<number>) so a tap there lands here already filtered.
@@ -163,11 +196,14 @@ export class SundayVisitComponent {
   private readonly workflows = toSignal(this.callingsService.listWorkflows(), {
     initialValue: [] as CallingWorkflow[],
   });
+  private readonly advancementWorkflows = toSignal(this.advancementsService.listWorkflows(), {
+    initialValue: [] as PriesthoodAdvancementWorkflow[],
+  });
   private readonly people = toSignal(this.peopleService.list(), {
     initialValue: [] as Person[],
   });
 
-  private personFor(w: CallingWorkflow): Person | null {
+  private personFor(w: { personId: string }): Person | null {
     return this.people().find((p) => p.id === w.personId) ?? null;
   }
 
@@ -212,6 +248,19 @@ export class SundayVisitComponent {
       }));
   });
 
+  protected readonly pendingOrdinations = computed(() => {
+    const unit = this.selectedUnit();
+    if (!unit) return [];
+    const actor = this.authService.appUser();
+    return this.advancementWorkflows()
+      .filter((w) => needsOrdination(w))
+      .filter((w) => isPersonPresentInUnit(w, this.personFor(w), unit))
+      .map((w) => ({
+        workflow: w,
+        canAct: canAdvanceStatus(actor, w.status, 'ordained'),
+      }));
+  });
+
   async sustainAndSetApart(w: CallingWorkflow): Promise<void> {
     const actor = this.authService.appUser();
     if (!actor) return;
@@ -246,6 +295,19 @@ export class SundayVisitComponent {
     try {
       await this.callingsService.advanceStatus(w, 'set_apart', actor, {
         setApartBy: actor.displayName,
+      });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async ordain(w: PriesthoodAdvancementWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.advancementsService.advanceStatus(w, 'ordained', actor, {
+        ordainedBy: actor.displayName,
       });
     } finally {
       this.busy.set(false);

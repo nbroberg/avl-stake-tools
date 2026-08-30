@@ -135,12 +135,21 @@ import {
               <strong>Advance status</strong>
               @if (s === 'ordained') {
                 <div class="field">
-                  <label>Ordained by (optional)</label>
-                  <input
-                    [ngModel]="pendingOrdainedBy()"
-                    (ngModelChange)="pendingOrdainedBy.set($event)"
-                    placeholder="e.g. President Whitfield"
-                  />
+                  @if (isHighCouncil(authService.appUser())) {
+                    <!-- Firestore rules only let a high councilor record
+                         ordained with their OWN recorded name. -->
+                    <label>Ordained by</label>
+                    <p class="text-sm" style="margin: 0">
+                      You, {{ authService.appUser()?.displayName }}.
+                    </p>
+                  } @else {
+                    <label>Ordained by (optional)</label>
+                    <input
+                      [ngModel]="pendingOrdainedBy()"
+                      (ngModelChange)="pendingOrdainedBy.set($event)"
+                      placeholder="e.g. President Whitfield"
+                    />
+                  }
                 </div>
               }
               <button
@@ -343,7 +352,14 @@ export class AdvancementDetailComponent {
     if (!actor || !w) return;
     this.busy.set(true);
     try {
-      const ordainedBy = status === 'ordained' ? this.pendingOrdainedBy().trim() : undefined;
+      // Firestore rules require a high councilor's ordainedBy to be their
+      // own recorded name - enforced here too, not just in the template.
+      const ordainedBy =
+        status === 'ordained'
+          ? isHighCouncil(actor)
+            ? actor.displayName
+            : this.pendingOrdainedBy().trim()
+          : undefined;
       await this.advancementsService.advanceStatus(w, status, actor, { ordainedBy });
       this.pendingOrdainedBy.set('');
     } finally {

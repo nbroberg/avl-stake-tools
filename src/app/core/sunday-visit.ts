@@ -1,6 +1,7 @@
-import { getNextStatuses } from './calling-status';
+import { getNextStatuses as getNextCallingStatuses } from './calling-status';
+import { getNextStatuses as getNextAdvancementStatuses } from './advancement-status';
 import { stakeUnits, type StakeUnit } from './units';
-import type { CallingWorkflow, Person } from '../models/types';
+import type { CallingWorkflow, Person, PriesthoodAdvancementWorkflow } from '../models/types';
 
 /**
  * Whether the person this workflow is about is physically present in
@@ -22,16 +23,21 @@ export function isPersonPresentInUnit(
 
 /** True for a workflow currently one step away from being sustained. */
 export function needsSustaining(workflow: CallingWorkflow): boolean {
-  return getNextStatuses(workflow.workflowType, workflow.status, workflow.callingName).includes(
+  return getNextCallingStatuses(workflow.workflowType, workflow.status, workflow.callingName).includes(
     'sustained',
   );
 }
 
 /** True for a workflow currently one step away from being set apart. */
 export function needsSetApart(workflow: CallingWorkflow): boolean {
-  return getNextStatuses(workflow.workflowType, workflow.status, workflow.callingName).includes(
+  return getNextCallingStatuses(workflow.workflowType, workflow.status, workflow.callingName).includes(
     'set_apart',
   );
+}
+
+/** True for a priesthood advancement currently one step away from ordination. */
+export function needsOrdination(workflow: PriesthoodAdvancementWorkflow): boolean {
+  return getNextAdvancementStatuses(workflow.status).includes('ordained');
 }
 
 /**

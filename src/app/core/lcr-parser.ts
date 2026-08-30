@@ -51,9 +51,16 @@ export interface LcrParseError {
 export interface LcrParseResult {
   rows: ParsedPersonRow[];
   errors: LcrParseError[];
-  /** Rows that had no in-scope calling; excluded from `rows` but tallied
-   *  for the import UI to show "N rows skipped (no in-scope calling)". */
-  skippedOutOfScope: number;
+  /**
+   * Count of rows in `rows` whose Callings cell matched none of the
+   * stake/bishopric/EQ vocabulary (core/callings-vocabulary.ts) - a
+   * Priest with no calling, a Sunday School teacher, etc. These people
+   * are still imported (with an empty `callings` array) so features that
+   * need the full roster by priesthood office - the Priesthood
+   * Advancement candidate picker, for one - can see them; this count is
+   * purely informational for the import review screen.
+   */
+  withoutTrackedCalling: number;
 }
 
 const HEADER_PATTERNS = {
@@ -158,16 +165,17 @@ function splitCallingsWithDates(
 /**
  * Parses a pasted LCR callings-report TSV export. First non-blank line
  * is the header and drives column mapping - column order and
- * unrecognized columns are both handled. Rows without at least one
- * in-scope calling are dropped (tallied in `skippedOutOfScope`); rows
- * missing Full Name, Birth Year, or a recognized Unit are collected in
- * `errors` with the source line number.
+ * unrecognized columns are both handled. Every person is imported
+ * regardless of calling - only their in-scope callings (if any) populate
+ * `callings`, tallied via `withoutTrackedCalling` for rows that have
+ * none. Rows missing Full Name, Birth Year, or a recognized Unit are
+ * collected in `errors` with the source line number instead.
  */
 export function parseLcrRoster(raw: string): LcrParseResult {
   const lines = raw.split(/\r?\n/);
   const rows: ParsedPersonRow[] = [];
   const errors: LcrParseError[] = [];
-  let skippedOutOfScope = 0;
+  let withoutTrackedCalling = 0;
 
   // Find the header line - first non-blank, non-"count:" line.
   let headerIdx = -1;
@@ -184,7 +192,7 @@ export function parseLcrRoster(raw: string): LcrParseResult {
     return {
       rows,
       errors: [{ line: 0, message: 'No content to parse.' }],
-      skippedOutOfScope,
+      withoutTrackedCalling,
     };
   }
 
@@ -209,7 +217,7 @@ export function parseLcrRoster(raw: string): LcrParseResult {
         `Missing required column${missing.length > 1 ? 's' : ''}: ${missing.map((k) => labels[k] ?? k).join(', ')}. ` +
         `Add these to your LCR custom report (Preferred Name and contact fields are optional).`,
     });
-    return { rows, errors, skippedOutOfScope };
+    return { rows, errors, withoutTrackedCalling };
   }
 
   const seenIds = new Set<string>();
@@ -279,8 +287,7 @@ export function parseLcrRoster(raw: string): LcrParseResult {
       }
     }
     if (callings.length === 0) {
-      skippedOutOfScope += 1;
-      continue;
+      withoutTrackedCalling += 1;
     }
 
     const id = `${slugify(fullName)}-${birthYear}`;
@@ -309,5 +316,5 @@ export function parseLcrRoster(raw: string): LcrParseResult {
     });
   }
 
-  return { rows, errors, skippedOutOfScope };
+  return { rows, errors, withoutTrackedCalling };
 }

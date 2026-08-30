@@ -13,9 +13,10 @@ import { PeopleService } from '../../core/people.service';
       <h1>Import from LCR</h1>
       <p class="muted text-sm">
         Open the callings custom report in LCR, copy the rows you need, and paste them below.
-        This never connects to LCR - it only parses text you've already copied. Only people with
-        an in-scope calling (stake, bishopric or branch presidency, elders quorum presidency) are
-        kept; other rows are counted and skipped.
+        This never connects to LCR - it only parses text you've already copied. Everyone in the
+        paste is imported; only the calling shown against them is filtered down to stake,
+        bishopric/branch presidency, or elders quorum presidency roles, since those are the only
+        ones this app tracks.
       </p>
       <p class="muted text-sm">
         Your LCR custom report must include: <strong>Full Name</strong>,
@@ -56,11 +57,11 @@ import { PeopleService } from '../../core/people.service';
         @if (result.rows.length > 0) {
           <div class="card stack">
             <strong>
-              Review {{ result.rows.length }} in-scope row(s) &middot;
+              Review {{ result.rows.length }} row(s) &middot;
               {{ selectedCount() }} selected
-              @if (result.skippedOutOfScope > 0) {
+              @if (result.withoutTrackedCalling > 0) {
                 <span class="muted text-sm">
-                  &middot; {{ result.skippedOutOfScope }} skipped (no in-scope calling)
+                  &middot; {{ result.withoutTrackedCalling }} with no in-scope calling
                 </span>
               }
             </strong>
@@ -205,7 +206,7 @@ export class RosterImportComponent {
   doParse(): void {
     const result = parseLcrRoster(this.raw());
     this.parseResult.set(result);
-    // Default: all in-scope rows selected.
+    // Default: every parsed row selected.
     this.selected.set(new Set(result.rows.map((r) => r.id)));
   }
 
