@@ -1,5 +1,5 @@
 import { getNextStatuses } from './calling-status';
-import { stakeUnits } from './units';
+import { stakeUnits, type StakeUnit } from './units';
 import type { CallingWorkflow, Person } from '../models/types';
 
 /**
@@ -35,6 +35,20 @@ export function needsSetApart(workflow: CallingWorkflow): boolean {
 }
 
 /**
+ * Whether a workflow still needs sustaining specifically in `unitNumber` -
+ * a ward/branch workflow needs it only in its own unit; a stake-wide one
+ * needs it in any unit that hasn't signed off yet.
+ */
+export function needsSustainingIn(
+  workflow: Pick<CallingWorkflow, 'unit' | 'sustainedInUnits'>,
+  unitNumber: string,
+): boolean {
+  return workflow.unit
+    ? workflow.unit === unitNumber
+    : !(workflow.sustainedInUnits ?? []).includes(unitNumber);
+}
+
+/**
  * Whether marking `unitNumber` finishes the sustaining. A ward/branch
  * workflow has no checklist - its one unit always finishes it. A
  * stake-wide workflow finishes only once every unit in the stake has
@@ -56,13 +70,53 @@ export function completesSustaining(
  * unit) and puts the visitor in the same room as the person being set
  * apart. A stake-wide calling that still needs other units, or one whose
  * person lives elsewhere, still gets sustained here - just not combined.
+ * Releases never combine - there's no set-apart phase to fold into their
+ * sustaining (their `sustained` status is a vote of thanks, not a calling
+ * to finish extending), so this is false for them regardless of unit.
  */
 export function canCombineSustainAndSetApart(
-  workflow: Pick<CallingWorkflow, 'unit' | 'sustainedInUnits'>,
+  workflow: Pick<CallingWorkflow, 'workflowType' | 'unit' | 'sustainedInUnits'>,
   person: Pick<Person, 'unit'> | null,
   unitNumber: string,
 ): boolean {
   return (
-    completesSustaining(workflow, unitNumber) && isPersonPresentInUnit(workflow, person, unitNumber)
+    workflow.workflowType === 'calling' &&
+    completesSustaining(workflow, unitNumber) &&
+    isPersonPresentInUnit(workflow, person, unitNumber)
   );
+}
+
+export interface UnitOutstanding {
+  unit: StakeUnit;
+  sustainings: number;
+  releases: number;
+  setApart: number;
+}
+
+/**
+ * Stake-wide summary of what's outstanding per unit - the dashboard's
+ * bird's-eye view of the same three buckets the Sunday page shows for one
+ * unit at a time. `peopleById` is only needed to resolve a stake-wide
+ * workflow's person to their home unit for the setApart count (see
+ * isPersonPresentInUnit); ward/branch workflows never need it.
+ */
+export function outstandingByUnit(
+  workflows: readonly CallingWorkflow[],
+  peopleById: ReadonlyMap<string, Person>,
+): UnitOutstanding[] {
+  return stakeUnits().map((unit) => {
+    let sustainings = 0;
+    let releases = 0;
+    let setApart = 0;
+    for (const w of workflows) {
+      if (needsSustaining(w) && needsSustainingIn(w, unit.number)) {
+        if (w.workflowType === 'release') releases++;
+        else sustainings++;
+      }
+      if (needsSetApart(w) && isPersonPresentInUnit(w, peopleById.get(w.personId) ?? null, unit.number)) {
+        setApart++;
+      }
+    }
+    return { unit, sustainings, releases, setApart };
+  });
 }

@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PeopleService } from '../core/people.service';
@@ -11,19 +11,22 @@ import {
   isPersonPresentInUnit,
   needsSetApart,
   needsSustaining,
+  needsSustainingIn,
 } from '../core/sunday-visit';
 import { stakeUnits } from '../core/units';
 import type { CallingWorkflow, Person } from '../models/types';
 
 /**
  * A councilor or presidency member picks the unit they're attending this
- * Sunday and sees exactly two things for it: what still needs sustaining
- * there, and who's ready to be set apart there. Sustaining and setting
- * apart get offered as one action whenever this visit is both the last
- * unit a stake-wide calling needs and the room the person is actually in
- * - see core/sunday-visit.ts for that rule. Everything else (proposing
- * callings, HC votes, notes) stays on the workflow detail page; this
- * view exists only to answer "what do I do here today."
+ * Sunday and sees exactly three things for it: new callings that still
+ * need sustaining, releases that still need their vote of thanks, and
+ * who's ready to be set apart. Sustaining and setting apart get offered
+ * as one action for a calling whenever this visit is both the last unit
+ * a stake-wide calling needs and the room the person is actually in -
+ * see core/sunday-visit.ts for that rule. Releases never combine with
+ * setting apart - there's no such phase for a release. Everything else
+ * (proposing callings, HC votes, notes) stays on the workflow detail
+ * page; this view exists only to answer "what do I do here today."
  */
 @Component({
   selector: 'app-sunday-visit',
@@ -32,7 +35,7 @@ import type { CallingWorkflow, Person } from '../models/types';
   template: `
     <div class="stack">
       <div>
-        <h1 style="margin: 0 0 0.25rem">Sunday Visit</h1>
+        <h1 style="margin: 0 0 0.25rem">Sunday</h1>
         <p class="muted" style="margin: 0">
           Pick the unit you're attending to see what's outstanding there.
         </p>
@@ -88,6 +91,33 @@ import type { CallingWorkflow, Person } from '../models/types';
         </div>
 
         <div class="card stack">
+          <strong>Releases</strong>
+          @if (pendingReleases().length === 0) {
+            <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
+          }
+          @for (row of pendingReleases(); track row.workflow.id) {
+            <div class="row-between sunday-row">
+              <div>
+                <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
+                <span class="muted"> — {{ row.workflow.callingName }}</span>
+                @if (!row.workflow.unit) {
+                  <p class="text-sm muted" style="margin: 0.15rem 0 0">
+                    Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
+                  </p>
+                }
+              </div>
+              @if (row.canAct) {
+                <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
+                  Record vote of thanks
+                </button>
+              } @else {
+                <span class="text-sm muted">Only the presidency or high council can record this.</span>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="card stack">
           <strong>Needs setting apart</strong>
           @if (pendingSetApart().length === 0) {
             <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
@@ -122,9 +152,12 @@ export class SundayVisitComponent {
   protected readonly authService = inject(AuthService);
   private readonly callingsService = inject(CallingsService);
   private readonly peopleService = inject(PeopleService);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly stakeUnitsList = stakeUnits();
-  protected readonly selectedUnit = signal('');
+  // Pre-selected from the dashboard's per-unit outstanding summary
+  // (?unit=<number>) so a tap there lands here already filtered.
+  protected readonly selectedUnit = signal(this.route.snapshot.queryParamMap.get('unit') ?? '');
   protected readonly busy = signal(false);
 
   private readonly workflows = toSignal(this.callingsService.listWorkflows(), {
@@ -138,19 +171,32 @@ export class SundayVisitComponent {
     return this.people().find((p) => p.id === w.personId) ?? null;
   }
 
-  protected readonly pendingSustaining = computed(() => {
-    const unit = this.selectedUnit();
-    if (!unit) return [];
+  /** Shared eligibility for anything (calling or release) that still
+   *  needs sustaining in `unit` - split into pendingSustaining and
+   *  pendingReleases below by workflowType. */
+  private eligibleForSustaining(unit: string) {
     const actor = this.authService.appUser();
     return this.workflows()
       .filter((w) => needsSustaining(w))
-      .filter((w) => (w.unit ? w.unit === unit : !(w.sustainedInUnits ?? []).includes(unit)))
+      .filter((w) => needsSustainingIn(w, unit))
       .map((w) => ({
         workflow: w,
         sustainedCount: w.sustainedInUnits?.length ?? 0,
         canCombine: canCombineSustainAndSetApart(w, this.personFor(w), unit),
         canAct: canAdvanceStatus(actor, w.status, 'sustained'),
       }));
+  }
+
+  protected readonly pendingSustaining = computed(() => {
+    const unit = this.selectedUnit();
+    if (!unit) return [];
+    return this.eligibleForSustaining(unit).filter((row) => row.workflow.workflowType === 'calling');
+  });
+
+  protected readonly pendingReleases = computed(() => {
+    const unit = this.selectedUnit();
+    if (!unit) return [];
+    return this.eligibleForSustaining(unit).filter((row) => row.workflow.workflowType === 'release');
   });
 
   protected readonly pendingSetApart = computed(() => {

@@ -3,10 +3,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
+import { PeopleService } from '../core/people.service';
 import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
 import { awaitsResponseFrom } from '../core/hc-review';
 import { awaitsResponseFrom as awaitsAdvancementResponseFrom } from '../core/advancement-review';
 import { isHighCouncil } from '../core/roles';
+import { outstandingByUnit } from '../core/sunday-visit';
+import type { Person } from '../models/types';
 
 @Component({
   selector: 'app-dashboard',
@@ -72,6 +75,33 @@ import { isHighCouncil } from '../core/roles';
         <p class="muted">Pick a workflow to get started.</p>
       }
 
+      <div class="card stack">
+        <strong>Sunday outlook</strong>
+        @if (unitsWithOutstanding().length === 0) {
+          <p class="text-sm muted" style="margin: 0">Nothing outstanding anywhere.</p>
+        }
+        @for (row of unitsWithOutstanding(); track row.unit.number) {
+          <a
+            class="list-item row-between"
+            [routerLink]="['/sunday-visit']"
+            [queryParams]="{ unit: row.unit.number }"
+          >
+            <strong>{{ row.unit.name }}</strong>
+            <span class="row text-sm muted" style="gap: 1rem">
+              @if (row.sustainings > 0) {
+                <span>{{ row.sustainings }} sustaining{{ row.sustainings === 1 ? '' : 's' }}</span>
+              }
+              @if (row.releases > 0) {
+                <span>{{ row.releases }} release{{ row.releases === 1 ? '' : 's' }}</span>
+              }
+              @if (row.setApart > 0) {
+                <span>{{ row.setApart }} set apart</span>
+              }
+            </span>
+          </a>
+        }
+      </div>
+
       <div class="stack">
         <a class="list-item" routerLink="/callings">
           <strong>Callings &amp; Sustainings</strong>
@@ -110,6 +140,20 @@ export class DashboardComponent {
   private readonly advancementWorkflows = toSignal(this.advancementsService.listWorkflows(), {
     initialValue: [],
   });
+
+  private readonly peopleService = inject(PeopleService);
+  private readonly people = toSignal(this.peopleService.list(), { initialValue: [] as Person[] });
+  private readonly peopleById = computed(() => new Map(this.people().map((p) => [p.id, p])));
+
+  /** The stake-wide "what's outstanding where" summary that feeds the
+   *  Sunday page's per-unit view - see core/sunday-visit.ts. Only units
+   *  with something outstanding are shown; a fully caught-up unit just
+   *  doesn't appear rather than showing three zeros. */
+  protected readonly unitsWithOutstanding = computed(() =>
+    outstandingByUnit(this.workflows(), this.peopleById()).filter(
+      (row) => row.sustainings + row.releases + row.setApart > 0,
+    ),
+  );
 
   protected readonly awaitingCount = computed(() => {
     const user = this.authService.appUser();
