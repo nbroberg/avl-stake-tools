@@ -1,23 +1,17 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { PeopleService } from '../../core/people.service';
-import { AuthService } from '../../core/auth.service';
-import { canManageRoster } from '../../core/roles';
 import { unitLabel } from '../../core/units';
 
 @Component({
   selector: 'app-people-list',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   template: `
     <div class="stack">
       <div class="row-between">
         <h1 style="margin: 0">Roster</h1>
-        @if (canManageRoster(authService.appUser())) {
-          <a class="btn btn-primary btn-row-action" routerLink="/people/import">Import from LCR</a>
-        }
       </div>
 
       <input
@@ -83,8 +77,6 @@ import { unitLabel } from '../../core/units';
 })
 export class PeopleListComponent {
   private readonly peopleService = inject(PeopleService);
-  protected readonly authService = inject(AuthService);
-  protected readonly canManageRoster = canManageRoster;
   protected readonly unitLabel = unitLabel;
   protected readonly people = toSignal(this.peopleService.list(), { initialValue: [] });
 

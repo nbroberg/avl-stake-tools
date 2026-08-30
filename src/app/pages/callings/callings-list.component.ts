@@ -58,7 +58,7 @@ function labelFor(w: CallingWorkflow): string {
   template: `
     <div class="stack">
       <div class="row-between">
-        <h1 style="margin: 0">Callings &amp; Sustainings</h1>
+        <h1 style="margin: 0">Callings &amp; Releases</h1>
         @if (canCreateWorkflow(authService.appUser())) {
           <a class="btn btn-primary btn-row-action" routerLink="/callings/new">+ New</a>
         }

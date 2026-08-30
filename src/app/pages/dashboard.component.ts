@@ -104,7 +104,7 @@ import type { Person } from '../models/types';
 
       <div class="stack">
         <a class="list-item" routerLink="/callings">
-          <strong>Callings &amp; Sustainings</strong>
+          <strong>Callings &amp; Releases</strong>
           <div class="muted text-sm">Track proposed callings and releases through completion.</div>
         </a>
         <a class="list-item" routerLink="/advancements">
