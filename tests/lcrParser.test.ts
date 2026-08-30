@@ -85,17 +85,23 @@ describe('parseLcrRoster', () => {
     });
   });
 
-  it('skips out-of-scope rows and tallies them', () => {
+  it('imports rows with no in-scope calling too, tallied but not dropped', () => {
     // Primary Teacher is a ward-auxiliary calling; nothing stake-touchable.
+    // The row is still imported (empty callings) so features keyed on
+    // priesthood office alone - e.g. the Priesthood Advancement candidate
+    // picker - can see everyone, not just calling holders.
     const out = parseLcrRoster(
       tsv(
         'Doe, Jane\t1985\tAsheville Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
         'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop (5 Mar 2026)\t',
       ),
     );
-    expect(out.rows).toHaveLength(1);
-    expect(out.rows[0].fullName).toBe('John Smith');
-    expect(out.skippedOutOfScope).toBe(1);
+    expect(out.rows).toHaveLength(2);
+    expect(out.rows[0].fullName).toBe('Jane Doe');
+    expect(out.rows[0].callings).toEqual([]);
+    expect(out.rows[1].fullName).toBe('John Smith');
+    expect(out.rows[1].callings).toEqual(['Bishop']);
+    expect(out.withoutTrackedCalling).toBe(1);
   });
 
   it('reports missing Birth Year', () => {
