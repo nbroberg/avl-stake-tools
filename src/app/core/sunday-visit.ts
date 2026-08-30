@@ -97,23 +97,26 @@ export interface UnitOutstanding {
   sustainings: number;
   releases: number;
   setApart: number;
+  ordinations: number;
 }
 
 /**
  * Stake-wide summary of what's outstanding per unit - the dashboard's
- * bird's-eye view of the same three buckets the Sunday page shows for one
+ * bird's-eye view of the same four buckets the Sunday page shows for one
  * unit at a time. `peopleById` is only needed to resolve a stake-wide
- * workflow's person to their home unit for the setApart count (see
- * isPersonPresentInUnit); ward/branch workflows never need it.
+ * workflow's person to their home unit for the setApart/ordinations counts
+ * (see isPersonPresentInUnit); ward/branch workflows never need it.
  */
 export function outstandingByUnit(
   workflows: readonly CallingWorkflow[],
+  advancementWorkflows: readonly PriesthoodAdvancementWorkflow[],
   peopleById: ReadonlyMap<string, Person>,
 ): UnitOutstanding[] {
   return stakeUnits().map((unit) => {
     let sustainings = 0;
     let releases = 0;
     let setApart = 0;
+    let ordinations = 0;
     for (const w of workflows) {
       if (needsSustaining(w) && needsSustainingIn(w, unit.number)) {
         if (w.workflowType === 'release') releases++;
@@ -123,6 +126,11 @@ export function outstandingByUnit(
         setApart++;
       }
     }
-    return { unit, sustainings, releases, setApart };
+    for (const w of advancementWorkflows) {
+      if (needsOrdination(w) && isPersonPresentInUnit(w, peopleById.get(w.personId) ?? null, unit.number)) {
+        ordinations++;
+      }
+    }
+    return { unit, sustainings, releases, setApart, ordinations };
   });
 }

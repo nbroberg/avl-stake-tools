@@ -9,7 +9,7 @@ import { awaitsResponseFrom } from '../core/hc-review';
 import { awaitsResponseFrom as awaitsAdvancementResponseFrom } from '../core/advancement-review';
 import { isHighCouncil } from '../core/roles';
 import { outstandingByUnit } from '../core/sunday-visit';
-import type { Person } from '../models/types';
+import type { Person, PriesthoodAdvancementWorkflow } from '../models/types';
 
 @Component({
   selector: 'app-dashboard',
@@ -97,6 +97,9 @@ import type { Person } from '../models/types';
               @if (row.setApart > 0) {
                 <span>{{ row.setApart }} set apart</span>
               }
+              @if (row.ordinations > 0) {
+                <span>{{ row.ordinations }} ordination{{ row.ordinations === 1 ? '' : 's' }}</span>
+              }
             </span>
           </a>
         }
@@ -138,7 +141,7 @@ export class DashboardComponent {
 
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
   private readonly advancementWorkflows = toSignal(this.advancementsService.listWorkflows(), {
-    initialValue: [],
+    initialValue: [] as PriesthoodAdvancementWorkflow[],
   });
 
   private readonly peopleService = inject(PeopleService);
@@ -150,8 +153,8 @@ export class DashboardComponent {
    *  with something outstanding are shown; a fully caught-up unit just
    *  doesn't appear rather than showing three zeros. */
   protected readonly unitsWithOutstanding = computed(() =>
-    outstandingByUnit(this.workflows(), this.peopleById()).filter(
-      (row) => row.sustainings + row.releases + row.setApart > 0,
+    outstandingByUnit(this.workflows(), this.advancementWorkflows(), this.peopleById()).filter(
+      (row) => row.sustainings + row.releases + row.setApart + row.ordinations > 0,
     ),
   );
 
