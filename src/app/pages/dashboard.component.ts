@@ -1,15 +1,16 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PeopleService } from '../core/people.service';
 import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
+import { RosterSyncService } from '../core/roster-sync.service';
 import { awaitsResponseFrom } from '../core/hc-review';
 import { awaitsResponseFrom as awaitsAdvancementResponseFrom } from '../core/advancement-review';
-import { isHighCouncil } from '../core/roles';
+import { isHighCouncil, isPresidency } from '../core/roles';
 import { outstandingByUnit } from '../core/sunday-visit';
-import type { Person, PriesthoodAdvancementWorkflow } from '../models/types';
+import type { Person, PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/types';
 
 @Component({
   selector: 'app-dashboard',
@@ -40,6 +41,19 @@ import type { Person, PriesthoodAdvancementWorkflow } from '../models/types';
       <h1 style="margin-bottom: 0">
         Welcome{{ authService.appUser() ? ', ' + authService.appUser()!.displayName : '' }}
       </h1>
+
+      @if (isPresidency(authService.appUser()) && rosterSyncPending()) {
+        <div class="card stack" style="border-left: 3px solid var(--warn)">
+          <strong>Roster sync required</strong>
+          <p class="text-sm muted" style="margin: 0">
+            A workflow was recorded in LCR, so the local roster may be behind. Re-run the LCR
+            sync, then mark it done here.
+          </p>
+          <button class="btn btn-responsive" [disabled]="clearingSync()" (click)="clearRosterSync()">
+            Mark roster synced
+          </button>
+        </div>
+      }
 
       <!-- A high councilor signing in has one question: what needs me? Answer
            it before the generic navigation, and say so plainly when the
@@ -133,6 +147,14 @@ import type { Person, PriesthoodAdvancementWorkflow } from '../models/types';
 export class DashboardComponent {
   protected readonly authService = inject(AuthService);
   protected readonly isHighCouncil = isHighCouncil;
+  protected readonly isPresidency = isPresidency;
+
+  private readonly rosterSyncService = inject(RosterSyncService);
+  private readonly rosterSync = toSignal(this.rosterSyncService.watch(), {
+    initialValue: null as RosterSyncStatus | null,
+  });
+  protected readonly rosterSyncPending = computed(() => this.rosterSync()?.pending === true);
+  protected readonly clearingSync = signal(false);
 
   private readonly callingsService = inject(CallingsService);
   private readonly workflows = toSignal(this.callingsService.listWorkflows(), {
@@ -168,4 +190,15 @@ export class DashboardComponent {
     return this.advancementWorkflows().filter((w) => awaitsAdvancementResponseFrom(w, user))
       .length;
   });
+
+  async clearRosterSync(): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.clearingSync.set(true);
+    try {
+      await this.rosterSyncService.clear(actor);
+    } finally {
+      this.clearingSync.set(false);
+    }
+  }
 }

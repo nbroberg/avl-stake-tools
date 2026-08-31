@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   addDoc,
   arrayRemove,
@@ -18,6 +18,7 @@ import { Observable } from 'rxjs';
 import { db } from './firebase';
 import { DATE_FIELD_BY_STATUS } from './calling-status';
 import { HC_QUORUM_REQUIRED } from './quorum';
+import { RosterSyncService } from './roster-sync.service';
 import { completesSustaining } from './sunday-visit';
 import type {
   AppUser,
@@ -62,6 +63,8 @@ export interface AdvanceStatusOptions {
 
 @Injectable({ providedIn: 'root' })
 export class CallingsService {
+  private readonly rosterSync = inject(RosterSyncService);
+
   listWorkflows(filters?: { unit?: string }): Observable<CallingWorkflow[]> {
     return new Observable<CallingWorkflow[]>((subscriber) => {
       const q = filters?.unit
@@ -139,13 +142,19 @@ export class CallingsService {
     const dateField = DATE_FIELD_BY_STATUS[newStatus];
     const assignedTo = newStatus === 'interview_assigned' ? options.assignedTo?.trim() : undefined;
     const setApartBy = newStatus === 'set_apart' ? options.setApartBy?.trim() : undefined;
+    // Recording in LCR is the last real-world step - nothing follows it -
+    // so it finalizes the workflow straight to `complete` rather than
+    // waiting on a separate "mark complete" click.
+    const finalizes = newStatus === 'recorded_in_lcr';
+    const status = finalizes ? 'complete' : newStatus;
 
     await runTransaction(db, async (tx) => {
       tx.update(ref, {
-        status: newStatus,
+        status,
         updatedBy: actor.firebaseUid,
         updatedAt: serverTimestamp(),
         ...(dateField ? { [dateField]: serverTimestamp() } : {}),
+        ...(finalizes ? { completedDate: serverTimestamp() } : {}),
         ...(assignedTo ? { assignedTo } : {}),
         ...(setApartBy ? { setApartBy } : {}),
       });
@@ -154,16 +163,19 @@ export class CallingsService {
     const noteParts: string[] = [];
     if (assignedTo) noteParts.push(`Assigned to ${assignedTo}.`);
     if (setApartBy) noteParts.push(`Set apart by ${setApartBy}.`);
+    if (finalizes) noteParts.push('Recorded in LCR; this finalizes the workflow.');
     if (options.note?.trim()) noteParts.push(options.note.trim());
     const note = noteParts.join(' ');
 
     await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
-      status: newStatus,
+      status,
       changedBy: actor.firebaseUid,
       changedByName: actor.displayName,
       changedAt: serverTimestamp(),
       ...(note ? { note } : {}),
     } satisfies WithFieldValue<Omit<CallingStatusHistoryEntry, 'id'>>);
+
+    if (finalizes) await this.rosterSync.flagRequired(actor);
   }
 
   async updateNotes(workflowId: string, notes: string, actor: AppUser): Promise<void> {

@@ -113,6 +113,27 @@ Every transition writes an entry to the workflow's `history/`
 subcollection (append-only, no updates or deletes) with the actor's UID,
 display name, and any note (e.g. the interview assignee's name).
 
+**Sustaining across the stake is presidency-overridable.** A stake-wide
+calling/release normally can't reach `Sustained` until every unit has
+signed off (see `core/sunday-visit.ts`'s `completesSustaining`), but the
+presidency can advance it anyway - Firestore rules already give them
+unconditional write access here. Doing so writes an explicit audit note
+recording how many units had actually confirmed at the time.
+
+**Recording in LCR finalizes the workflow.** Marking `Recorded in LCR`
+writes straight through to `Complete` in the same update (both dates get
+stamped) rather than waiting on a separate click - there's nothing left
+to do once it's recorded. It also flips `rosterSync/status` to
+`pending: true`, which shows the presidency a "Roster sync required"
+banner on the dashboard, since the `people` collection has no live LCR
+connection and may now be behind. A completed roster import clears the
+flag automatically - both the in-app paste importer
+(`pages/people/roster-import.component.ts`) and the `tools/lcr-client`
+CLI do this on a successful write - since an import actually catching
+the roster up is a real, observable event, unlike an LCR-side change
+happening at all. The dashboard also has a manual "Mark roster synced"
+button as a fallback for anything outside those two paths.
+
 ## Project layout
 
 ```

@@ -87,6 +87,19 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
+    // rosterSync - single doc (rosterSync/status) flagging whether the
+    // `people` roster is known to be behind LCR. There's no live LCR
+    // connection (see core/roster-sync.ts), so this is presidency-
+    // acknowledged, not auto-detected: the app sets it whenever a workflow
+    // finalizes via "recorded in LCR"; only the presidency clears it, once
+    // they've actually re-run the sync.
+    // ---------------------------------------------------------------------
+    match /rosterSync/{docId} {
+      allow read: if isAnyApprovedUser();
+      allow write: if isPresidency();
+    }
+
+    // ---------------------------------------------------------------------
     // callingWorkflows - lifecycle tracking + audit history subcollection.
     // History is append-only: no update/delete once written.
     // ---------------------------------------------------------------------

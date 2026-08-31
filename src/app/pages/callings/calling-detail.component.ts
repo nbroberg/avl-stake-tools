@@ -234,6 +234,12 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
                 <span class="muted">no stake conference to sustain this at, so it's ward-by-ward</span>
               }
             </p>
+            @if (!sustainingComplete() && isPresidency(authService.appUser())) {
+              <p class="text-sm muted" style="margin: 0">
+                You may mark this sustained now anyway — doing so before every unit confirms
+                will be noted in the audit trail below.
+              </p>
+            }
             @for (u of stakeUnitsList; track u.number) {
               <label class="row" style="gap: 0.5rem; align-items: center">
                 <input
@@ -634,13 +640,15 @@ export class CallingDetailComponent {
 
   /**
    * HC's advance to high_council_approved needs quorum AND no concern
-   * still outstanding - the same condition firestore.rules enforces.
-   * Presidency can bypass both. All other transitions aren't gated here
-   * (the role check handles them).
+   * still outstanding - the same condition firestore.rules enforces. A
+   * stake-wide workflow's advance to `sustained` needs every unit
+   * checked off. Presidency can bypass both - on the record, see the
+   * note advance() attaches when it does. All other transitions aren't
+   * gated here (the role check handles them).
    */
   advanceButtonEnabled(w: CallingWorkflow, to: string): boolean {
     if (to === 'sustained' && !w.unit) {
-      return this.sustainingComplete();
+      return this.sustainingComplete() || isPresidency(this.authService.appUser());
     }
     if (isPresidency(this.authService.appUser())) return true;
     if (w.status === 'presidency_approved' && to === 'high_council_approved') {
@@ -709,7 +717,15 @@ export class CallingDetailComponent {
             ? actor.displayName
             : this.pendingSetApartBy().trim()
           : undefined;
-      await this.callingsService.advanceStatus(w, status, actor, { assignedTo, setApartBy });
+      // Presidency bypassing the "every unit" sustaining checklist - flag
+      // it plainly in the audit trail rather than letting it read like an
+      // ordinary sustaining.
+      const note =
+        status === 'sustained' && !w.unit && !this.sustainingComplete()
+          ? `Sustained by the stake presidency; only ${this.sustainedUnitCount()} of ` +
+            `${this.stakeUnitsList.length} units had confirmed.`
+          : undefined;
+      await this.callingsService.advanceStatus(w, status, actor, { assignedTo, setApartBy, note });
       this.pendingAssignee.set('');
       this.pendingSetApartBy.set('');
     } finally {

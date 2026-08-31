@@ -377,3 +377,20 @@ export interface AdvancementHistoryEntry {
   note?: string;
   kind?: HistoryEntryKind;
 }
+
+/**
+ * rosterSync/status - a single singleton doc flagging whether the
+ * Firestore `people` roster is known to be behind LCR. There's no live
+ * connection between this app and LCR (see core/roster-sync.ts), so this
+ * is presidency-acknowledged, not auto-detected: recording a workflow in
+ * LCR sets `pending: true`; the presidency clears it once they've re-run
+ * the roster sync/import.
+ */
+export interface RosterSyncStatus {
+  pending: boolean;
+  lastRecordedAt?: Timestamp;
+  lastRecordedBy?: string;
+  clearedAt?: Timestamp;
+  clearedBy?: string;
+  clearedByName?: string;
+}

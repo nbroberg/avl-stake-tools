@@ -1,8 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
 import { parseLcrRoster, type LcrParseResult } from '../../core/lcr-parser';
 import { PeopleService } from '../../core/people.service';
+import { RosterSyncService } from '../../core/roster-sync.service';
 
 @Component({
   selector: 'app-roster-import',
@@ -185,6 +187,8 @@ import { PeopleService } from '../../core/people.service';
 })
 export class RosterImportComponent {
   private readonly peopleService = inject(PeopleService);
+  private readonly rosterSyncService = inject(RosterSyncService);
+  private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
   protected readonly raw = signal('');
@@ -239,6 +243,10 @@ export class RosterImportComponent {
           sustainedAt: Object.keys(r.sustainedAt).length ? r.sustainedAt : undefined,
         });
       }
+      // A completed import is the roster catching up to LCR - clear
+      // whatever "recorded in LCR" transitions flagged as pending.
+      const actor = this.authService.appUser();
+      if (chosen.length > 0 && actor) await this.rosterSyncService.clear(actor);
       void this.router.navigateByUrl('/people');
     } finally {
       this.saving.set(false);
