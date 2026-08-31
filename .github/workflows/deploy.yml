@@ -5,8 +5,12 @@
 #
 # GitHub Pages has no server-side URL rewriting, so client-side routes
 # like /callings/<id> break on refresh unless index.html is also served
-# as 404.html. Angular's build honors --base-href for the project-page
-# URL shape https://<owner>.github.io/<repo>/.
+# as 404.html.
+#
+# Served from the custom domain in public/CNAME (lcr.avlstake.org), so
+# the app lives at the domain root - base-href is "/", not "/<repo>/".
+# public/CNAME must ship in every deploy artifact or GitHub Pages drops
+# the custom domain on the next Actions-based deploy.
 #
 # Firestore rules are NOT deployed by this workflow - that stays a
 # deliberate manual step via `firebase deploy --only firestore:rules`,
@@ -75,8 +79,7 @@ jobs:
 
       - name: Build
         run: |
-          npx ng build --configuration production \
-            --base-href "/${{ github.event.repository.name }}/"
+          npx ng build --configuration production --base-href "/"
 
       - name: Prepare Pages artifact
         run: |
