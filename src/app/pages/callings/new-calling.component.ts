@@ -390,27 +390,55 @@ export class NewCallingComponent {
   protected readonly workflowType = signal<CallingWorkflowType>('calling');
 
   /**
-   * Release mode only ever needs current calling-holders (a small
-   * fraction of the roster - see PeopleService.listWithCalling), while
-   * Calling mode needs everyone, since a new candidate often holds
-   * nothing yet. Switching modes re-queries rather than filtering a
-   * single always-full roster client-side.
+   * Everyone who currently holds at least one in-scope calling, anywhere
+   * in the stake - PeopleService.listWithCalling, a small fraction of
+   * the roster. Deliberately NOT unit-restricted, even though the form
+   * usually targets one ward: a shared calling name like "Bishop" or
+   * "Ward Clerk" exists in every ward, and the swap notice below needs
+   * to catch whoever currently holds THAT NAME anywhere, not just in
+   * the ward being staffed. This is the whole data source Release mode
+   * needs, and also feeds Calling mode's "already held" warning.
    */
-  protected readonly people = toSignal(
-    toObservable(this.workflowType).pipe(
-      switchMap((type) =>
-        type === 'release' ? this.peopleService.listWithCalling() : this.peopleService.list(),
+  private readonly peopleWithCalling = toSignal(this.peopleService.listWithCalling(), {
+    initialValue: [],
+  });
+
+  /**
+   * Candidate pool for Calling mode, unit-restricted when a unit is
+   * picked. Only `unit` is a safe exact-match field to push to
+   * Firestore - priesthoodOffice is free-text from a pasted LCR export
+   * and matched case-insensitively client-side (see
+   * calling-authorities.ts), so an exact-match Firestore filter on it
+   * risks silently dropping real candidates over a casing difference.
+   * Narrowing to the unit alone is still a real win for ward/branch/EQ
+   * callings, without that risk. Irrelevant in Release mode, which
+   * sources candidates from currentHoldings/peopleWithCalling instead -
+   * a new calling candidate often holds nothing yet, so this can't be
+   * limited to peopleWithCalling the way Release mode is.
+   */
+  private readonly candidateQuery = computed((): { kind: 'unit'; unit: string } | { kind: 'all' } => {
+    const scope = this.unitScope();
+    const unit = this.unit();
+    if (scope !== 'none' && unit) return { kind: 'unit', unit };
+    return { kind: 'all' };
+  });
+
+  private readonly candidatePool = toSignal(
+    toObservable(this.candidateQuery).pipe(
+      switchMap((q) =>
+        q.kind === 'unit' ? this.peopleService.listByUnit(q.unit) : this.peopleService.list(),
       ),
     ),
     { initialValue: [] },
   );
 
-  /** All (calling → holders) pairs derived from the roster. Powers the
-   *  release-mode calling dropdown ("only show filled callings") and
-   *  the release-mode person list ("only the current holders"). */
+  /** All (calling → holders) pairs derived from peopleWithCalling. Powers
+   *  the release-mode calling dropdown ("only show filled callings"),
+   *  the release-mode person list ("only the current holders"), and
+   *  Calling mode's "already held" swap notice. */
   private readonly currentHoldings = computed(() => {
     const map = new Map<string, Person[]>();
-    for (const p of this.people()) {
+    for (const p of this.peopleWithCalling()) {
       for (const c of p.callings ?? []) {
         const arr = map.get(c);
         if (arr) arr.push(p);
@@ -420,26 +448,20 @@ export class NewCallingComponent {
     return map;
   });
 
-  /** People who satisfy the calling's priesthood requirement AND, for
-   *  ward/branch/EQ callings, are members of the selected unit. When
-   *  the calling is unit-scoped but no unit has been picked yet, the
-   *  unit constraint is skipped (the list is only filtered by
-   *  priesthood) so the user isn't staring at an empty dropdown before
-   *  they pick a unit. */
+  /** People who satisfy the calling's priesthood requirement - the unit
+   *  constraint doesn't need re-checking here, since candidatePool is
+   *  already restricted to the selected unit whenever one applies (see
+   *  candidateQuery). */
   protected readonly eligiblePeople = computed(() => {
     const name = this.callingName();
-    if (!name) return this.people();
-    const byPriesthood = eligibleCallees(name, this.people());
-    const scope = this.unitScope();
-    const unit = this.unit();
-    if (scope === 'none' || !unit) return byPriesthood;
-    return byPriesthood.filter((p) => p.unit === unit);
+    if (!name) return this.candidatePool();
+    return eligibleCallees(name, this.candidatePool());
   });
 
   /** How many people got dropped by the current filter set, for the
    *  "N other people don't qualify" hint. */
   protected readonly filteredOutCount = computed(
-    () => this.people().length - this.eligiblePeople().length,
+    () => this.candidatePool().length - this.eligiblePeople().length,
   );
 
   /** Eligible people alphabetized by display name for the candidate list. */
@@ -620,7 +642,13 @@ export class NewCallingComponent {
 
   async submit(): Promise<void> {
     const actor = this.authService.appUser();
-    const person = this.people().find((p) => p.id === this.personId());
+    // The selected person came from candidatePool (Calling mode) or
+    // peopleWithCalling (Release mode) depending on workflowType - check
+    // whichever is relevant rather than re-deriving mode-branching logic
+    // here.
+    const person =
+      this.candidatePool().find((p) => p.id === this.personId()) ??
+      this.peopleWithCalling().find((p) => p.id === this.personId());
     if (!actor || !person || !this.callingName()) return;
     // Unit is only prompted for in Calling mode; on Release we derive it
     // from the person we're releasing (whose unit is authoritative for

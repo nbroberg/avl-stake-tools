@@ -80,6 +80,26 @@ export class PeopleService {
   }
 
   /**
+   * People in a single ward/branch - the candidate pool for a unit-scoped
+   * calling is always a subset of these. `unit` is an exact stake-unit
+   * code (see core/units.ts), not free text, so an equality filter is
+   * safe here in a way it isn't for priesthoodOffice (see
+   * NewCallingComponent.peopleQuery for why that one stays client-side).
+   *
+   * No `orderBy` - callers that need name order already sort client-side.
+   */
+  listByUnit(unit: string): Observable<Person[]> {
+    return new Observable<Person[]>((subscriber) => {
+      const q = query(collection(db, COLLECTION), where('unit', '==', unit));
+      return onSnapshot(
+        q,
+        (snap) => subscriber.next(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)),
+        (err) => subscriber.error(err),
+      );
+    });
+  }
+
+  /**
    * Insert or update a person by id (slug). The id is the document id,
    * so re-importing the same person overwrites in place - Firestore
    * enforces uniqueness on the id. Fields left undefined on `input` are

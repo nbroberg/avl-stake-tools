@@ -13,7 +13,8 @@ import { demoPeople } from './demo-data';
  */
 @Injectable()
 export class DemoPeopleService
-  implements Pick<PeopleService, 'list' | 'listWithCalling' | 'upsertPerson' | 'update'>
+  implements
+    Pick<PeopleService, 'list' | 'listWithCalling' | 'listByUnit' | 'upsertPerson' | 'update'>
 {
   private readonly people$ = new BehaviorSubject<Person[]>(demoPeople());
 
@@ -25,6 +26,15 @@ export class DemoPeopleService
     return new Observable<Person[]>((subscriber) => {
       const sub = this.people$.subscribe((people) => {
         subscriber.next(people.filter((p) => (p.callings ?? []).length > 0));
+      });
+      return () => sub.unsubscribe();
+    });
+  }
+
+  listByUnit(unit: string): Observable<Person[]> {
+    return new Observable<Person[]>((subscriber) => {
+      const sub = this.people$.subscribe((people) => {
+        subscriber.next(people.filter((p) => p.unit === unit));
       });
       return () => sub.unsubscribe();
     });
