@@ -1,13 +1,21 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { switchMap } from 'rxjs';
 import { PeopleService } from '../../core/people.service';
+import { PAGE_INCREMENT, estimateInitialPageSize } from '../../core/page-size';
 import { unitLabel } from '../../core/units';
+import { LoadMoreSentinelDirective } from '../../shared/load-more-sentinel.directive';
+
+// The stacked-card layout below 640px is much taller per row than the
+// desktop table, so a mobile screenful holds far fewer people.
+const ROW_HEIGHT_STACKED_PX = 140;
+const ROW_HEIGHT_TABLE_PX = 44;
 
 @Component({
   selector: 'app-people-list',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadMoreSentinelDirective],
   template: `
     <div class="stack">
       <div class="row-between">
@@ -71,6 +79,12 @@ import { unitLabel } from '../../core/units';
         @if (visible().length === 0) {
           <p class="muted">No people yet.</p>
         }
+        @if (!reachedEnd()) {
+          <!-- Scrolling this into view - whether by the user reaching the
+               bottom, or because a filter left too little content to fill
+               the screen - means there may be more to load. -->
+          <div appLoadMoreSentinel (visible)="loadMore()" style="height: 1px"></div>
+        }
       </div>
     </div>
   `,
@@ -78,7 +92,22 @@ import { unitLabel } from '../../core/units';
 export class PeopleListComponent {
   private readonly peopleService = inject(PeopleService);
   protected readonly unitLabel = unitLabel;
-  protected readonly people = toSignal(this.peopleService.list(), { initialValue: [] });
+
+  protected readonly pageSize = signal(
+    estimateInitialPageSize(
+      typeof window !== 'undefined' && window.innerWidth < 640
+        ? ROW_HEIGHT_STACKED_PX
+        : ROW_HEIGHT_TABLE_PX,
+    ),
+  );
+
+  protected readonly people = toSignal(
+    toObservable(this.pageSize).pipe(switchMap((n) => this.peopleService.list(n))),
+    { initialValue: [] },
+  );
+
+  /** Firestore returned fewer docs than asked for, so there's nothing more to page in. */
+  protected readonly reachedEnd = computed(() => this.people().length < this.pageSize());
 
   protected readonly filter = signal('');
 
@@ -86,4 +115,8 @@ export class PeopleListComponent {
     const q = this.filter().toLowerCase();
     return this.people().filter((p) => p.name.toLowerCase().includes(q));
   });
+
+  protected loadMore(): void {
+    if (!this.reachedEnd()) this.pageSize.update((n) => n + PAGE_INCREMENT);
+  }
 }

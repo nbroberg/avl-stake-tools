@@ -1,13 +1,19 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
 import { PriesthoodAdvancementsService } from '../../core/priesthood-advancements.service';
+import { PAGE_INCREMENT, estimateInitialPageSize } from '../../core/page-size';
 import { canCreateWorkflow } from '../../core/roles';
 import { workflowScopeLabel } from '../../core/units';
 import { awaitsResponseFrom } from '../../core/advancement-review';
 import { AuthService } from '../../core/auth.service';
+import { LoadMoreSentinelDirective } from '../../shared/load-more-sentinel.directive';
 import { StatusBadgeComponent } from '../../shared/status-badge.component';
+
+// Rough height of a `.list-item` card (title + subtitle line, plus margin).
+const ROW_HEIGHT_PX = 84;
 import {
   ADVANCEMENT_STATUS_LABELS,
   ADVANCEMENT_TYPE_LABELS,
@@ -17,7 +23,7 @@ import {
 @Component({
   selector: 'app-advancements-list',
   standalone: true,
-  imports: [FormsModule, RouterLink, StatusBadgeComponent],
+  imports: [FormsModule, RouterLink, StatusBadgeComponent, LoadMoreSentinelDirective],
   styles: [
     `
       .awaiting-banner {
@@ -103,6 +109,13 @@ import {
             </a>
           }
         </div>
+
+        @if (!reachedEnd()) {
+          <!-- Scrolling this into view - whether by the user reaching the
+               bottom, or because a filter left too little content to fill
+               the screen - means there may be more to load. -->
+          <div appLoadMoreSentinel (visible)="loadMore()" style="height: 1px"></div>
+        }
       }
     </div>
   `,
@@ -118,9 +131,20 @@ export class AdvancementsListComponent {
   protected readonly onlyAwaiting = signal(false);
 
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
-  protected readonly workflows = toSignal(this.advancementsService.listWorkflows(), {
-    initialValue: null,
-  });
+  protected readonly pageSize = signal(estimateInitialPageSize(ROW_HEIGHT_PX));
+  protected readonly workflows = toSignal(
+    toObservable(this.pageSize).pipe(
+      switchMap((limit) => this.advancementsService.listWorkflows({ limit })),
+    ),
+    { initialValue: null },
+  );
+
+  /** Firestore returned fewer docs than asked for, so there's nothing more to page in. */
+  protected readonly reachedEnd = computed(() => (this.workflows()?.length ?? 0) < this.pageSize());
+
+  protected loadMore(): void {
+    if (!this.reachedEnd()) this.pageSize.update((n) => n + PAGE_INCREMENT);
+  }
 
   protected readonly awaitingMine = computed(() => {
     const user = this.authService.appUser();

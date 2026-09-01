@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {
   collection,
   doc,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -32,9 +33,18 @@ export interface UpsertPersonInput {
 
 @Injectable({ providedIn: 'root' })
 export class PeopleService {
-  list(): Observable<Person[]> {
+  /**
+   * @param limitCount Caps how many docs the query pulls, ordered by name.
+   *   Omit to fetch the whole roster (needed by lookups that must find any
+   *   given person, e.g. detail pages and calling/advancement pickers).
+   */
+  list(limitCount?: number): Observable<Person[]> {
     return new Observable<Person[]>((subscriber) => {
-      const q = query(collection(db, COLLECTION), orderBy('name', 'asc'));
+      const q = query(
+        collection(db, COLLECTION),
+        orderBy('name', 'asc'),
+        ...(limitCount ? [limit(limitCount)] : []),
+      );
       return onSnapshot(
         q,
         (snap) => subscriber.next(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)),

@@ -5,6 +5,7 @@ import {
   arrayUnion,
   collection,
   doc,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -58,15 +59,22 @@ export interface AdvanceAdvancementStatusOptions {
 export class PriesthoodAdvancementsService {
   private readonly rosterSync = inject(RosterSyncService);
 
-  listWorkflows(filters?: { unit?: string }): Observable<PriesthoodAdvancementWorkflow[]> {
+  /**
+   * @param filters.limit Caps how many docs the query pulls, newest first.
+   *   Omit to fetch every workflow (needed by lookups that must find any
+   *   given workflow, e.g. the dashboard counts and detail pages).
+   */
+  listWorkflows(filters?: {
+    unit?: string;
+    limit?: number;
+  }): Observable<PriesthoodAdvancementWorkflow[]> {
     return new Observable<PriesthoodAdvancementWorkflow[]>((subscriber) => {
-      const q = filters?.unit
-        ? query(
-            collection(db, COLLECTION),
-            where('unit', '==', filters.unit),
-            orderBy('createdAt', 'desc'),
-          )
-        : query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
+      const q = query(
+        collection(db, COLLECTION),
+        ...(filters?.unit ? [where('unit', '==', filters.unit)] : []),
+        orderBy('createdAt', 'desc'),
+        ...(filters?.limit ? [limit(filters.limit)] : []),
+      );
 
       return onSnapshot(
         q,
