@@ -2,8 +2,17 @@
  * Rough vertical space taken by page chrome above a list (heading, filter
  * controls, any banners) that isn't available for rows.
  */
-const HEADER_RESERVE_PX = 260;
-const MIN_PAGE_SIZE = 15;
+const HEADER_RESERVE_PX = 220;
+
+/**
+ * Absolute floor, so a very short viewport never asks for a silly-small
+ * page. Kept low on purpose - with the row heights and header reserve in
+ * use, a typical phone viewport lands only a couple of rows above this,
+ * so a higher floor would swallow the viewport estimate entirely and the
+ * page size would stop varying by form factor at all (which is what
+ * happened before this was tuned down).
+ */
+const MIN_PAGE_SIZE = 6;
 const MAX_INITIAL_PAGE_SIZE = 150;
 
 /** Extra rows requested each time the load-more sentinel comes into view. */
