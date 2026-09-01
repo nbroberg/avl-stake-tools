@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { switchMap } from 'rxjs';
+import { switchMap, tap } from 'rxjs';
 import { PeopleService } from '../../core/people.service';
 import { PAGE_INCREMENT, estimateInitialPageSize } from '../../core/page-size';
 import { unitLabel } from '../../core/units';
@@ -102,12 +102,26 @@ export class PeopleListComponent {
   );
 
   protected readonly people = toSignal(
-    toObservable(this.pageSize).pipe(switchMap((n) => this.peopleService.list(n))),
+    toObservable(this.pageSize).pipe(
+      switchMap((n) => this.peopleService.list(n).pipe(tap(() => this.loadingMore.set(false)))),
+    ),
     { initialValue: [] },
   );
 
   /** Firestore returned fewer docs than asked for, so there's nothing more to page in. */
   protected readonly reachedEnd = computed(() => this.people().length < this.pageSize());
+
+  /**
+   * Guards against the load-more sentinel re-firing before the previous
+   * bump has rendered. The sentinel's IntersectionObserver doesn't only
+   * fire on the transition into view - it can fire again whenever the
+   * sentinel's position shifts while still visible, which happens on every
+   * bump as new rows push it further down. Without this guard, a burst of
+   * those firings before Firestore responds would each bump the page size,
+   * cascading straight to the whole collection instead of one page at a
+   * time.
+   */
+  protected readonly loadingMore = signal(false);
 
   protected readonly filter = signal('');
 
@@ -117,6 +131,8 @@ export class PeopleListComponent {
   });
 
   protected loadMore(): void {
-    if (!this.reachedEnd()) this.pageSize.update((n) => n + PAGE_INCREMENT);
+    if (this.reachedEnd() || this.loadingMore()) return;
+    this.loadingMore.set(true);
+    this.pageSize.update((n) => n + PAGE_INCREMENT);
   }
 }

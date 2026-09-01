@@ -2,7 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { switchMap } from 'rxjs';
+import { switchMap, tap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { estimateInitialPageSize } from '../../core/page-size';
 import { canCreateWorkflow } from '../../core/roles';
@@ -153,7 +153,11 @@ export class CallingsListComponent {
   protected readonly pageSize = signal(estimateInitialPageSize(ROW_HEIGHT_PX));
   protected readonly workflows = toSignal(
     toObservable(this.pageSize).pipe(
-      switchMap((limit) => this.callingsService.listWorkflows({ limit })),
+      switchMap((limit) =>
+        this.callingsService
+          .listWorkflows({ limit })
+          .pipe(tap(() => this.loadingMore.set(false))),
+      ),
     ),
     { initialValue: null },
   );
@@ -161,8 +165,17 @@ export class CallingsListComponent {
   /** Firestore returned fewer docs than asked for, so there's nothing more to page in. */
   protected readonly reachedEnd = computed(() => (this.workflows()?.length ?? 0) < this.pageSize());
 
+  /**
+   * Guards against the load-more sentinel re-firing before the previous
+   * bump has rendered - see PeopleListComponent.loadingMore for why this
+   * is needed.
+   */
+  protected readonly loadingMore = signal(false);
+
   protected loadMore(): void {
-    if (!this.reachedEnd()) this.pageSize.update((n) => n + PAGE_INCREMENT);
+    if (this.reachedEnd() || this.loadingMore()) return;
+    this.loadingMore.set(true);
+    this.pageSize.update((n) => n + PAGE_INCREMENT);
   }
 
   /** Workflows this signed-in high councilor still owes a response. */
