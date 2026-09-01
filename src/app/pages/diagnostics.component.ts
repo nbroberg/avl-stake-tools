@@ -176,7 +176,7 @@ export class DiagnosticsComponent {
       }
 
       try {
-        await getDoc(doc(db, 'callingWorkflows', '__diagnostics_probe__'));
+        await getDoc(doc(db, 'callingWorkflows', '_diagnostics_probe_'));
         this.setCheck('rulesReject', {
           result: 'pass',
           detail:
