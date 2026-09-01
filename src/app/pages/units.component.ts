@@ -1,6 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
@@ -41,7 +40,7 @@ import {
 @Component({
   selector: 'app-units',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [RouterLink],
   template: `
     <div class="stack">
       <div>
@@ -60,10 +59,7 @@ import {
             </button>
           }
         </div>
-        @if (unitsWithOutstanding().length === 0) {
-          <p class="text-sm muted" style="margin: 0">Nothing outstanding anywhere.</p>
-        }
-        @for (row of unitsWithOutstanding(); track row.unit.number) {
+        @for (row of unitsOutlook(); track row.unit.number) {
           <button
             type="button"
             class="unit-outlook-row"
@@ -86,16 +82,6 @@ import {
             </span>
           </button>
         }
-      </div>
-
-      <div class="field">
-        <label for="unit">Unit</label>
-        <select id="unit" [ngModel]="selectedUnit()" (ngModelChange)="selectedUnit.set($event)">
-          <option value="" disabled>Select a unit…</option>
-          @for (u of stakeUnitsList; track u.number) {
-            <option [value]="u.number">{{ u.name }}</option>
-          }
-        </select>
       </div>
 
       @if (selectedUnit()) {
@@ -276,18 +262,16 @@ export class UnitsComponent {
     return this.people().find((p) => p.id === w.personId) ?? null;
   }
 
-  /** Stake-wide summary of what's outstanding in each unit - lets a
-   *  presidency/HC member jump straight to a unit with something pending
-   *  instead of stepping through the dropdown blind. Moved here from the
-   *  dashboard so this page carries its own "what needs attention" view.
-   *  Once a unit is picked (from here or the dropdown), this narrows to
-   *  just that unit so the outlook doesn't keep listing unrelated units
-   *  alongside the detail cards below. */
-  protected readonly unitsWithOutstanding = computed(() => {
+  /** Stake-wide summary of what's outstanding in each unit - lists every
+   *  unit (even ones with nothing pending) so this doubles as the unit
+   *  picker now that the dropdown is gone. Once a unit is picked, this
+   *  narrows to just that unit so the outlook doesn't keep listing
+   *  unrelated units alongside the detail cards below. */
+  protected readonly unitsOutlook = computed(() => {
     const unit = this.selectedUnit();
-    return outstandingByUnit(this.workflows(), this.advancementWorkflows(), this.peopleById())
-      .filter((row) => row.sustainings + row.releases + row.setApart + row.ordinations > 0)
-      .filter((row) => !unit || row.unit.number === unit);
+    return outstandingByUnit(this.workflows(), this.advancementWorkflows(), this.peopleById()).filter(
+      (row) => !unit || row.unit.number === unit,
+    );
   });
 
   /** Shared eligibility for anything (calling or release) that still
