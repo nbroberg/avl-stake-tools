@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
-import { PAGE_INCREMENT, estimateInitialPageSize } from '../../core/page-size';
+import { estimateInitialPageSize } from '../../core/page-size';
 import { canCreateWorkflow } from '../../core/roles';
 import { workflowScopeLabel } from '../../core/units';
 import { awaitsResponseFrom } from '../../core/hc-review';
@@ -14,6 +14,11 @@ import { StatusBadgeComponent } from '../../shared/status-badge.component';
 
 // Rough height of a `.list-item` card (title + subtitle line, plus margin).
 const ROW_HEIGHT_PX = 84;
+// Smaller than core/page-size's default increment - this collection is a
+// handful of in-flight workflows plus history, not a whole membership
+// roster, so a big batch would swallow the rest of it in one hop and make
+// the paging invisible.
+const PAGE_INCREMENT = 8;
 import {
   CALLING_STATUS_LABELS,
   RELEASE_STATUS_LABELS,
