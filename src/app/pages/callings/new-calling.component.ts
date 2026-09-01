@@ -31,6 +31,9 @@ interface CallingDropdownGroup {
   options: Array<{ name: string; holderCount?: number }>;
 }
 
+/** Candidates shown in the person picker once there's a search query. */
+const RESULTS_LIMIT = 8;
+
 const CALLING_GROUPS: CallingOptionGroup[] = [
   // Stake callings are LCR-categorized so the dropdown has one optgroup
   // per stake-org section rather than one 100+-item block.
@@ -212,10 +215,18 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
                 </label>
               }
             </div>
+            @if (matchedCandidates().length > searchedCandidates().length) {
+              <span class="text-sm muted">
+                Showing the first {{ searchedCandidates().length }} matches — refine your search
+                to narrow further.
+              </span>
+            }
           } @else if (displayedCandidates().length > 0 && personQuery().trim()) {
             <span class="text-sm muted">
               No one matches "{{ personQuery().trim() }}".
             </span>
+          } @else if (displayedCandidates().length > 0) {
+            <span class="text-sm muted">Start typing a name to search.</span>
           }
           @if (workflowType() === 'release') {
             @if (callingName() && displayedCandidates().length === 0) {
@@ -461,15 +472,23 @@ export class NewCallingComponent {
 
   protected readonly personQuery = signal('');
 
-  /** displayedCandidates further narrowed by the name search box. Search
+  /** displayedCandidates narrowed by the name search box. Nothing shows
+   *  until there's a query - for a unit or stake-wide calling that list
+   *  can run long, and making the search a precondition instead of a
+   *  refinement keeps the page from rendering everyone by default. Search
    *  never affects eligibility - only what's iterated in the template -
    *  so a selected person stays selected even if a later search hides
    *  their row. */
-  protected readonly searchedCandidates = computed(() => {
+  protected readonly matchedCandidates = computed(() => {
     const q = this.personQuery().trim().toLowerCase();
-    if (!q) return this.displayedCandidates();
+    if (!q) return [];
     return this.displayedCandidates().filter((p) => p.name.toLowerCase().includes(q));
   });
+
+  /** matchedCandidates capped to the first RESULTS_LIMIT - see RESULTS_LIMIT. */
+  protected readonly searchedCandidates = computed(() =>
+    this.matchedCandidates().slice(0, RESULTS_LIMIT),
+  );
 
   /** Calling dropdown options in the current mode. For a release, we
    *  hide every calling nobody in the roster holds — you can't release

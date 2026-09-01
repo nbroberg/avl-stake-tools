@@ -14,6 +14,9 @@ import {
 
 const ADVANCEMENT_TYPES: PriesthoodAdvancementType[] = ['priest_to_elder', 'elder_to_high_priest'];
 
+/** Candidates shown in the person picker once there's a search query. */
+const RESULTS_LIMIT = 8;
+
 @Component({
   selector: 'app-new-advancement',
   standalone: true,
@@ -69,10 +72,18 @@ const ADVANCEMENT_TYPES: PriesthoodAdvancementType[] = ['priest_to_elder', 'elde
                 </label>
               }
             </div>
+            @if (matchedPeople().length > searchedPeople().length) {
+              <span class="text-sm muted">
+                Showing the first {{ searchedPeople().length }} matches — refine your search to
+                narrow further.
+              </span>
+            }
           } @else if (eligiblePeople().length > 0 && personQuery().trim()) {
             <span class="text-sm muted">
               No one matches "{{ personQuery().trim() }}".
             </span>
+          } @else if (eligiblePeople().length > 0) {
+            <span class="text-sm muted">Start typing a name to search.</span>
           } @else {
             <span class="text-sm muted">
               No one in the roster is currently on record as {{ fromOffice() }}.
@@ -182,15 +193,20 @@ export class NewAdvancementComponent {
 
   protected readonly personQuery = signal('');
 
-  /** eligiblePeople further narrowed by the name search box. Search never
-   *  affects eligibility - only what's iterated in the template - so a
-   *  selected person stays selected even if a later search hides their
-   *  row. */
-  protected readonly searchedPeople = computed(() => {
+  /** eligiblePeople narrowed by the name search box. Nothing shows until
+   *  there's a query, and matches are capped to RESULTS_LIMIT - see
+   *  NewCallingComponent.matchedCandidates for the same pattern and why.
+   *  Search never affects eligibility - only what's iterated in the
+   *  template - so a selected person stays selected even if a later
+   *  search hides their row. */
+  protected readonly matchedPeople = computed(() => {
     const q = this.personQuery().trim().toLowerCase();
-    if (!q) return this.eligiblePeople();
+    if (!q) return [];
     return this.eligiblePeople().filter((p) => p.name.toLowerCase().includes(q));
   });
+
+  /** matchedPeople capped to the first RESULTS_LIMIT. */
+  protected readonly searchedPeople = computed(() => this.matchedPeople().slice(0, RESULTS_LIMIT));
 
   constructor() {
     // Prefill from query params when the form is reached via a
