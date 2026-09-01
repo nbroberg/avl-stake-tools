@@ -1,7 +1,8 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { PeopleService } from '../../core/people.service';
 import { AuthService } from '../../core/auth.service';
@@ -385,7 +386,24 @@ export class NewCallingComponent {
 
   protected readonly callingGroups = CALLING_GROUPS;
   protected readonly unitLabel = unitLabel;
-  protected readonly people = toSignal(this.peopleService.list(), { initialValue: [] });
+
+  protected readonly workflowType = signal<CallingWorkflowType>('calling');
+
+  /**
+   * Release mode only ever needs current calling-holders (a small
+   * fraction of the roster - see PeopleService.listWithCalling), while
+   * Calling mode needs everyone, since a new candidate often holds
+   * nothing yet. Switching modes re-queries rather than filtering a
+   * single always-full roster client-side.
+   */
+  protected readonly people = toSignal(
+    toObservable(this.workflowType).pipe(
+      switchMap((type) =>
+        type === 'release' ? this.peopleService.listWithCalling() : this.peopleService.list(),
+      ),
+    ),
+    { initialValue: [] },
+  );
 
   /** All (calling → holders) pairs derived from the roster. Powers the
    *  release-mode calling dropdown ("only show filled callings") and
@@ -551,7 +569,6 @@ export class NewCallingComponent {
     return 'unit';
   });
 
-  protected readonly workflowType = signal<CallingWorkflowType>('calling');
   protected readonly personId = signal('');
   protected readonly callingName = signal('');
   protected readonly unit = signal('');

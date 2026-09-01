@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { db } from './firebase';
@@ -45,6 +46,31 @@ export class PeopleService {
         orderBy('name', 'asc'),
         ...(limitCount ? [limit(limitCount)] : []),
       );
+      return onSnapshot(
+        q,
+        (snap) => subscriber.next(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)),
+        (err) => subscriber.error(err),
+      );
+    });
+  }
+
+  /**
+   * People with at least one in-scope calling on record - the release
+   * candidate pool is always a subset of these, so this is the whole
+   * roster the Release form actually needs, typically a small fraction
+   * of the full membership. The LCR import always writes `callings` as
+   * an array, even an empty one (see lcr-parser.ts), never leaving it
+   * unset, so the inequality filter reliably excludes only the people
+   * who truly hold nothing.
+   *
+   * No `orderBy` here on purpose - Firestore requires an inequality
+   * filter's field to be the first orderBy, and ordering by an array
+   * value wouldn't be meaningful anyway. Callers that need name order
+   * already sort client-side.
+   */
+  listWithCalling(): Observable<Person[]> {
+    return new Observable<Person[]>((subscriber) => {
+      const q = query(collection(db, COLLECTION), where('callings', '!=', []));
       return onSnapshot(
         q,
         (snap) => subscriber.next(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)),

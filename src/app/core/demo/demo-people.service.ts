@@ -12,11 +12,22 @@ import { demoPeople } from './demo-data';
  * everything discarded on reload.
  */
 @Injectable()
-export class DemoPeopleService implements Pick<PeopleService, 'list' | 'upsertPerson' | 'update'> {
+export class DemoPeopleService
+  implements Pick<PeopleService, 'list' | 'listWithCalling' | 'upsertPerson' | 'update'>
+{
   private readonly people$ = new BehaviorSubject<Person[]>(demoPeople());
 
   list(): Observable<Person[]> {
     return this.people$.asObservable();
+  }
+
+  listWithCalling(): Observable<Person[]> {
+    return new Observable<Person[]>((subscriber) => {
+      const sub = this.people$.subscribe((people) => {
+        subscriber.next(people.filter((p) => (p.callings ?? []).length > 0));
+      });
+      return () => sub.unsubscribe();
+    });
   }
 
   async upsertPerson(input: UpsertPersonInput): Promise<void> {
