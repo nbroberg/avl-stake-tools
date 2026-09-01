@@ -18,6 +18,7 @@ import {
   eligibleCallees,
   isSingletonCalling,
   priesthoodRequirementFor,
+  requiresExistingCalling,
 } from '../../core/calling-authorities';
 import { stakeUnits, unitLabel } from '../../core/units';
 import type { CallingWorkflowType, Person } from '../../models/types';
@@ -151,6 +152,24 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
               }
             </ul>
           </div>
+        }
+
+        @if (
+          workflowType() === 'calling' && callingName() && requiresExistingCalling(callingName())
+        ) {
+          <!-- Stake and bishopric/branch-presidency callings are usually
+               extended to someone already serving elsewhere, so the
+               candidate list defaults to that - this is the escape hatch
+               for the rare legitimate exception. -->
+          <label class="row text-sm muted" style="gap: 0.5rem; min-height: var(--tap)">
+            <input
+              type="checkbox"
+              [ngModel]="includeNoCurrentCalling()"
+              (ngModelChange)="includeNoCurrentCalling.set($event)"
+              name="includeNoCurrentCalling"
+            />
+            Include people with no current calling
+          </label>
         }
 
         <div class="field">
@@ -386,6 +405,7 @@ export class NewCallingComponent {
 
   protected readonly callingGroups = CALLING_GROUPS;
   protected readonly unitLabel = unitLabel;
+  protected readonly requiresExistingCalling = requiresExistingCalling;
 
   protected readonly workflowType = signal<CallingWorkflowType>('calling');
 
@@ -451,11 +471,15 @@ export class NewCallingComponent {
   /** People who satisfy the calling's priesthood requirement - the unit
    *  constraint doesn't need re-checking here, since candidatePool is
    *  already restricted to the selected unit whenever one applies (see
-   *  candidateQuery). */
+   *  candidateQuery) - AND, for stake-org and bishopric/branch-presidency
+   *  callings, already hold some other calling (see
+   *  requiresExistingCalling), unless the override toggle is on. */
   protected readonly eligiblePeople = computed(() => {
     const name = this.callingName();
     if (!name) return this.candidatePool();
-    return eligibleCallees(name, this.candidatePool());
+    const byPriesthood = eligibleCallees(name, this.candidatePool());
+    if (!requiresExistingCalling(name) || this.includeNoCurrentCalling()) return byPriesthood;
+    return byPriesthood.filter((p) => (p.callings ?? []).length > 0);
   });
 
   /** How many people got dropped by the current filter set, for the
@@ -553,12 +577,16 @@ export class NewCallingComponent {
   /** Which filters are currently narrowing the person list — used in
    *  the hint sentence beneath the dropdown. */
   protected readonly filterReasons = computed(() => {
+    const name = this.callingName();
     const parts: string[] = [];
-    if (this.callingName() && priesthoodRequirementFor(this.callingName()) !== 'none') {
+    if (name && priesthoodRequirementFor(name) !== 'none') {
       parts.push('priesthood-office requirement');
     }
     if (this.unitScope() !== 'none' && this.unit()) {
       parts.push('unit');
+    }
+    if (name && requiresExistingCalling(name) && !this.includeNoCurrentCalling()) {
+      parts.push('having a current calling');
     }
     return parts.length > 0 ? parts.join(' and ') : 'no filters';
   });
@@ -595,6 +623,8 @@ export class NewCallingComponent {
   protected readonly callingName = signal('');
   protected readonly unit = signal('');
   protected readonly notes = signal('');
+  /** Overrides requiresExistingCalling's default - see eligiblePeople. */
+  protected readonly includeNoCurrentCalling = signal(false);
 
   protected readonly saving = signal(false);
   protected readonly error = signal<string | null>(null);

@@ -581,6 +581,21 @@ export function eligibleCallees(
 }
 
 /**
+ * Whether candidates for this calling are expected to already hold some
+ * other calling - the norm for stake-org and bishopric/branch-presidency
+ * positions, which are extended under stake presidency authority, but
+ * not for Elders Quorum presidency callings, which the bishop extends
+ * on his own. This is a default the New Calling form applies to the
+ * candidate list, not a hard rule - it offers a toggle to include people
+ * with no current calling for the rare legitimate exception (a new
+ * move-in still getting their first assignment, say).
+ */
+export function requiresExistingCalling(callingName: string): boolean {
+  const bucket = bucketOf(callingName);
+  return bucket === 'stake' || bucket === 'bishopric';
+}
+
+/**
  * Which priesthood advancement (if any) would close the gap between a
  * person's current office and a calling's TRUE requirement. Only the two
  * transitions the advancement flow tracks are ever suggested - a deeper
