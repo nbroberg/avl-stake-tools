@@ -24,7 +24,7 @@ import { ROLE_LABELS } from '../models/types';
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
           >Dashboard</a
         >
-        <a routerLink="/sunday-visit" routerLinkActive="active">Sunday</a>
+        <a routerLink="/units" routerLinkActive="active">Units</a>
         <a routerLink="/callings" routerLinkActive="active">Callings</a>
         <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
         <a routerLink="/scope" routerLinkActive="active">Scope</a>

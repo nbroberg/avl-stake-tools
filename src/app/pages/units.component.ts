@@ -14,6 +14,7 @@ import {
   needsSetApart,
   needsSustaining,
   needsSustainingIn,
+  outstandingByUnit,
 } from '../core/sunday-visit';
 import { stakeUnits } from '../core/units';
 import {
@@ -38,16 +39,46 @@ import {
  * page; this view exists only to answer "what do I do here today."
  */
 @Component({
-  selector: 'app-sunday-visit',
+  selector: 'app-units',
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
     <div class="stack">
       <div>
-        <h1 style="margin: 0 0 0.25rem">Sunday</h1>
+        <h1 style="margin: 0 0 0.25rem">Units</h1>
         <p class="muted" style="margin: 0">
           Pick the unit you're attending to see what's outstanding there.
         </p>
+      </div>
+
+      <div class="card stack">
+        <strong>Outlook</strong>
+        @if (unitsWithOutstanding().length === 0) {
+          <p class="text-sm muted" style="margin: 0">Nothing outstanding anywhere.</p>
+        }
+        @for (row of unitsWithOutstanding(); track row.unit.number) {
+          <button
+            type="button"
+            class="unit-outlook-row"
+            (click)="selectedUnit.set(row.unit.number)"
+          >
+            <strong>{{ row.unit.name }}</strong>
+            <span class="row text-sm muted" style="gap: 1rem">
+              @if (row.sustainings > 0) {
+                <span>{{ row.sustainings }} sustaining{{ row.sustainings === 1 ? '' : 's' }}</span>
+              }
+              @if (row.releases > 0) {
+                <span>{{ row.releases }} release{{ row.releases === 1 ? '' : 's' }}</span>
+              }
+              @if (row.setApart > 0) {
+                <span>{{ row.setApart }} set apart</span>
+              }
+              @if (row.ordinations > 0) {
+                <span>{{ row.ordinations }} ordination{{ row.ordinations === 1 ? '' : 's' }}</span>
+              }
+            </span>
+          </button>
+        }
       </div>
 
       <div class="field">
@@ -187,10 +218,28 @@ import {
     `
       .sunday-row { align-items: flex-start; padding: 0.5rem 0; border-top: 1px solid var(--border); }
       .sunday-row:first-of-type { border-top: none; padding-top: 0; }
+
+      /* A plain button reset to look and lay out like a row, not a button -
+         clicking it just selects the unit in place, no navigation. */
+      .unit-outlook-row {
+        all: unset;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.75rem;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.5rem 0;
+        border-top: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .unit-outlook-row:first-of-type { border-top: none; padding-top: 0; }
+      .unit-outlook-row:hover, .unit-outlook-row:focus-visible { background: var(--bg); }
     `,
   ],
 })
-export class SundayVisitComponent {
+export class UnitsComponent {
   protected readonly authService = inject(AuthService);
   private readonly callingsService = inject(CallingsService);
   private readonly peopleService = inject(PeopleService);
@@ -214,10 +263,21 @@ export class SundayVisitComponent {
   private readonly people = toSignal(this.peopleService.list(), {
     initialValue: [] as Person[],
   });
+  private readonly peopleById = computed(() => new Map(this.people().map((p) => [p.id, p])));
 
   private personFor(w: { personId: string }): Person | null {
     return this.people().find((p) => p.id === w.personId) ?? null;
   }
+
+  /** Stake-wide summary of what's outstanding in each unit - lets a
+   *  presidency/HC member jump straight to a unit with something pending
+   *  instead of stepping through the dropdown blind. Moved here from the
+   *  dashboard so this page carries its own "what needs attention" view. */
+  protected readonly unitsWithOutstanding = computed(() =>
+    outstandingByUnit(this.workflows(), this.advancementWorkflows(), this.peopleById()).filter(
+      (row) => row.sustainings + row.releases + row.setApart + row.ordinations > 0,
+    ),
+  );
 
   /** Shared eligibility for anything (calling or release) that still
    *  needs sustaining in `unit` - split into pendingSustaining and

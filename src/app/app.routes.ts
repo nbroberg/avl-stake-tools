@@ -14,7 +14,7 @@ import { AdvancementDetailComponent } from './pages/advancements/advancement-det
 import { PeopleListComponent } from './pages/people/people-list.component';
 import { RosterImportComponent } from './pages/people/roster-import.component';
 import { ScopeComponent } from './pages/scope/scope.component';
-import { SundayVisitComponent } from './pages/sunday-visit.component';
+import { UnitsComponent } from './pages/units.component';
 
 export const routes: Routes = [
   // Public routes - no sign-in required.
@@ -32,7 +32,7 @@ export const routes: Routes = [
       { path: 'callings', component: CallingsListComponent },
       { path: 'callings/new', component: NewCallingComponent },
       { path: 'callings/:id', component: CallingDetailComponent },
-      { path: 'sunday-visit', component: SundayVisitComponent },
+      { path: 'units', component: UnitsComponent },
       { path: 'advancements', component: AdvancementsListComponent },
       { path: 'advancements/new', component: NewAdvancementComponent },
       { path: 'advancements/:id', component: AdvancementDetailComponent },
