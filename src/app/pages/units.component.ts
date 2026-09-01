@@ -52,7 +52,14 @@ import {
       </div>
 
       <div class="card stack">
-        <strong>Outlook</strong>
+        <div class="row-between">
+          <strong>Outlook</strong>
+          @if (selectedUnit()) {
+            <button type="button" class="btn text-sm" (click)="selectedUnit.set('')">
+              Show all units
+            </button>
+          }
+        </div>
         @if (unitsWithOutstanding().length === 0) {
           <p class="text-sm muted" style="margin: 0">Nothing outstanding anywhere.</p>
         }
@@ -272,12 +279,16 @@ export class UnitsComponent {
   /** Stake-wide summary of what's outstanding in each unit - lets a
    *  presidency/HC member jump straight to a unit with something pending
    *  instead of stepping through the dropdown blind. Moved here from the
-   *  dashboard so this page carries its own "what needs attention" view. */
-  protected readonly unitsWithOutstanding = computed(() =>
-    outstandingByUnit(this.workflows(), this.advancementWorkflows(), this.peopleById()).filter(
-      (row) => row.sustainings + row.releases + row.setApart + row.ordinations > 0,
-    ),
-  );
+   *  dashboard so this page carries its own "what needs attention" view.
+   *  Once a unit is picked (from here or the dropdown), this narrows to
+   *  just that unit so the outlook doesn't keep listing unrelated units
+   *  alongside the detail cards below. */
+  protected readonly unitsWithOutstanding = computed(() => {
+    const unit = this.selectedUnit();
+    return outstandingByUnit(this.workflows(), this.advancementWorkflows(), this.peopleById())
+      .filter((row) => row.sustainings + row.releases + row.setApart + row.ordinations > 0)
+      .filter((row) => !unit || row.unit.number === unit);
+  });
 
   /** Shared eligibility for anything (calling or release) that still
    *  needs sustaining in `unit` - split into pendingSustaining and
