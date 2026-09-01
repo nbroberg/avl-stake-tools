@@ -157,10 +157,9 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         @if (
           workflowType() === 'calling' && callingName() && requiresExistingCalling(callingName())
         ) {
-          <!-- Stake and bishopric/branch-presidency callings are usually
-               extended to someone already serving elsewhere, so the
-               candidate list defaults to that - this is the escape hatch
-               for the rare legitimate exception. -->
+          <!-- These callings are usually extended to someone already
+               serving elsewhere, so the candidate list defaults to that -
+               this is the escape hatch for the rare legitimate exception. -->
           <label class="row text-sm muted" style="gap: 0.5rem; min-height: var(--tap)">
             <input
               type="checkbox"
@@ -471,8 +470,7 @@ export class NewCallingComponent {
   /** People who satisfy the calling's priesthood requirement - the unit
    *  constraint doesn't need re-checking here, since candidatePool is
    *  already restricted to the selected unit whenever one applies (see
-   *  candidateQuery) - AND, for stake-org and bishopric/branch-presidency
-   *  callings, already hold some other calling (see
+   *  candidateQuery) - AND already hold some other calling (see
    *  requiresExistingCalling), unless the override toggle is on. */
   protected readonly eligiblePeople = computed(() => {
     const name = this.callingName();
