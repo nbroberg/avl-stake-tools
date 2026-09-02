@@ -307,6 +307,16 @@ input:not([type='checkbox']):not([type='radio']), select, textarea {
 
 .app-nav::-webkit-scrollbar { display: none; }
 
+/* iOS Safari shoves a `position: fixed; bottom: 0` element up to sit just
+   above the on-screen keyboard rather than leaving it below the fold, which
+   for a persistent tab bar looks like it's floating mid-screen, stacked on
+   top of Safari's own autofill toolbar. Hiding the bar while a text field
+   is focused (LayoutComponent tracks this) sidesteps the whole thing - it
+   only matters on phones, where the bar is fixed in the first place. */
+@media (max-width: 719.98px) {
+  .app-nav.keyboard-active { display: none; }
+}
+
 .app-nav a {
   /* Grow to share the bar evenly, but never shrink a label into an ellipsis -
      if the five tabs don't fit (narrow phones, large text settings) the bar
