@@ -33,6 +33,7 @@ export class DemoCallingsService
       | 'create'
       | 'advanceStatus'
       | 'updateNotes'
+      | 'deleteWorkflow'
       | 'approveByHighCouncil'
       | 'withdrawHighCouncilApproval'
       | 'raiseHighCouncilConcern'
@@ -143,6 +144,10 @@ export class DemoCallingsService
       updatedBy: actor.firebaseUid,
       updatedAt: Timestamp.now(),
     }));
+  }
+
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    this.workflows$.next(this.workflows$.value.filter((w) => w.id !== workflowId));
   }
 
   async approveByHighCouncil(workflowId: string, actor: AppUser): Promise<void> {

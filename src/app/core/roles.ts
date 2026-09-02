@@ -35,6 +35,11 @@ export function canEditNotes(user: AppUser | null): boolean {
   return isPresidency(user);
 }
 
+/** Only the presidency can delete a calling/release/advancement workflow. */
+export function canDeleteWorkflow(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
+
 /**
  * Whether the caller may advance a workflow from `from` to `to`.
  * - Presidency: any legal transition.

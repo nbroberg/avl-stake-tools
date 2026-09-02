@@ -4,6 +4,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   limit,
   onSnapshot,
@@ -179,6 +180,11 @@ export class PriesthoodAdvancementsService {
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
     });
+  }
+
+  /** See CallingsService.deleteWorkflow - identical semantics. */
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTION, workflowId));
   }
 
   /** See CallingsService.approveByHighCouncil - identical semantics. */

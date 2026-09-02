@@ -4,6 +4,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   limit,
   onSnapshot,
@@ -189,6 +190,17 @@ export class CallingsService {
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
     });
+  }
+
+  /**
+   * Delete a calling or release workflow outright - for entries created in
+   * error, duplicated, or otherwise never meant to exist. Presidency-only
+   * (see firestore.rules). The `history` subcollection is append-only by
+   * rule and is deliberately left behind rather than deleted, so the audit
+   * trail survives even a mistaken workflow's removal.
+   */
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTION, workflowId));
   }
 
   /**

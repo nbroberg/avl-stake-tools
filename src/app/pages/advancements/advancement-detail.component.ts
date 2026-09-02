@@ -1,13 +1,19 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { map, of, switchMap } from 'rxjs';
 import { PriesthoodAdvancementsService } from '../../core/priesthood-advancements.service';
 import { PeopleService } from '../../core/people.service';
 import { formatTimestamp } from '../../core/calling-status';
 import { getNextStatuses } from '../../core/advancement-status';
-import { canAdvanceStatus, canEditNotes, isHighCouncil, isPresidency } from '../../core/roles';
+import {
+  canAdvanceStatus,
+  canDeleteWorkflow,
+  canEditNotes,
+  isHighCouncil,
+  isPresidency,
+} from '../../core/roles';
 import { namesFor, tally } from '../../core/advancement-review';
 import {
   personSatisfiesPriesthood,
@@ -269,6 +275,34 @@ import {
             </table>
           </div>
         </div>
+
+        @if (canDeleteWorkflow(authService.appUser())) {
+          <div class="card stack danger-zone">
+            @if (confirmingDelete()) {
+              <span class="text-sm">
+                Permanently delete this {{ typeLabels[w.advancementType] }} record for
+                {{ w.personName }}? This can't be undone; the audit history below will remain but
+                the workflow itself will be gone.
+              </span>
+              <div class="row">
+                <button class="btn btn-danger" [disabled]="busy()" (click)="deleteWorkflow(w.id)">
+                  Yes, delete
+                </button>
+                <button class="btn" [disabled]="busy()" (click)="confirmingDelete.set(false)">
+                  Cancel
+                </button>
+              </div>
+            } @else {
+              <button
+                class="btn btn-danger btn-responsive"
+                [disabled]="busy()"
+                (click)="confirmingDelete.set(true)"
+              >
+                Delete this advancement
+              </button>
+            }
+          </div>
+        }
       </div>
     } @else {
       <p class="muted">Loading…</p>
@@ -290,6 +324,9 @@ import {
         gap: 0.6rem;
       }
       .roster-line { line-height: 1.45; }
+      .danger-zone {
+        border: 1px solid var(--danger);
+      }
       @media (max-width: 639.98px) {
         .history .note-empty { display: none; }
       }
@@ -333,6 +370,7 @@ import {
 export class AdvancementDetailComponent {
   protected readonly authService = inject(AuthService);
   protected readonly canEditNotes = canEditNotes;
+  protected readonly canDeleteWorkflow = canDeleteWorkflow;
   protected readonly isHighCouncil = isHighCouncil;
   protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
@@ -346,6 +384,7 @@ export class AdvancementDetailComponent {
   protected readonly unitLabel = unitLabel;
 
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
   private readonly peopleService = inject(PeopleService);
 
@@ -440,6 +479,7 @@ export class AdvancementDetailComponent {
   protected readonly pendingOrdainedBy = signal('');
   protected readonly busy = signal(false);
   protected readonly confirmingApproval = signal(false);
+  protected readonly confirmingDelete = signal(false);
 
   constructor() {
     let seeded = false;
@@ -542,6 +582,16 @@ export class AdvancementDetailComponent {
     this.busy.set(true);
     try {
       await this.advancementsService.updateNotes(workflowId, this.notes(), actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.advancementsService.deleteWorkflow(workflowId);
+      await this.router.navigate(['/advancements']);
     } finally {
       this.busy.set(false);
     }

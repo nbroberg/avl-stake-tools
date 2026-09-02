@@ -1,11 +1,17 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map, of, switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { formatTimestamp, getNextStatuses } from '../../core/calling-status';
-import { canAdvanceStatus, canEditNotes, isHighCouncil, isPresidency } from '../../core/roles';
+import {
+  canAdvanceStatus,
+  canDeleteWorkflow,
+  canEditNotes,
+  isHighCouncil,
+  isPresidency,
+} from '../../core/roles';
 import { namesFor, tally } from '../../core/hc-review';
 import { stakeUnits, workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
@@ -389,6 +395,33 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
             </table>
           </div>
         </div>
+
+        @if (canDeleteWorkflow(authService.appUser())) {
+          <div class="card stack danger-zone">
+            @if (confirmingDelete()) {
+              <span class="text-sm">
+                Permanently delete this {{ w.workflowType }} for {{ w.personName }}? This can't be
+                undone; the audit history below will remain but the workflow itself will be gone.
+              </span>
+              <div class="row">
+                <button class="btn btn-danger" [disabled]="busy()" (click)="deleteWorkflow(w.id)">
+                  Yes, delete
+                </button>
+                <button class="btn" [disabled]="busy()" (click)="confirmingDelete.set(false)">
+                  Cancel
+                </button>
+              </div>
+            } @else {
+              <button
+                class="btn btn-danger btn-responsive"
+                [disabled]="busy()"
+                (click)="confirmingDelete.set(true)"
+              >
+                Delete this {{ w.workflowType }}
+              </button>
+            }
+          </div>
+        }
       </div>
     } @else {
       <p class="muted">Loading…</p>
@@ -438,6 +471,9 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
         gap: 0.6rem;
       }
       .roster-line { line-height: 1.45; }
+      .danger-zone {
+        border: 1px solid var(--danger);
+      }
       @media (max-width: 639.98px) {
         /* A cell with no note would otherwise render as an empty stacked row. */
         .history .note-empty { display: none; }
@@ -448,6 +484,7 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
 export class CallingDetailComponent {
   protected readonly authService = inject(AuthService);
   protected readonly canEditNotes = canEditNotes;
+  protected readonly canDeleteWorkflow = canDeleteWorkflow;
   protected readonly isHighCouncil = isHighCouncil;
   protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
@@ -460,6 +497,7 @@ export class CallingDetailComponent {
   protected readonly stakeUnitsList = stakeUnits();
 
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly callingsService = inject(CallingsService);
   private readonly peopleService = inject(PeopleService);
 
@@ -619,6 +657,7 @@ export class CallingDetailComponent {
   protected readonly pendingSetApartBy = signal('');
   protected readonly busy = signal(false);
   protected readonly confirmingApproval = signal(false);
+  protected readonly confirmingDelete = signal(false);
 
   constructor() {
     // Seed the notes textarea once the workflow first loads, without
@@ -775,6 +814,16 @@ export class CallingDetailComponent {
     this.busy.set(true);
     try {
       await this.callingsService.updateNotes(workflowId, this.notes(), actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.callingsService.deleteWorkflow(workflowId);
+      await this.router.navigate(['/callings']);
     } finally {
       this.busy.set(false);
     }
