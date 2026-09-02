@@ -26,8 +26,23 @@ export interface ParsedPersonRow {
   unit: string;
   /** Display name for the unit; kept for the review table. */
   unitName: string;
-  /** In-scope calling roles only (stake / bishopric / EQ presidency). */
+  /**
+   * In-scope calling roles only (stake / bishopric / EQ presidency),
+   * as canonical vocabulary names - this is what workflow logic
+   * (eligibility, holder lookups, singleton checks) matches against,
+   * so it stays a filtered, canonicalized subset even though
+   * `allCallings` now carries everything.
+   */
   callings: string[];
+  /**
+   * Every calling in the pasted cell, in-scope or not, as LCR's own
+   * text (not canonicalized) - Primary Teacher, Ward Missionary,
+   * Relief Society President, whatever's actually there. This is what
+   * "does this person currently serve in anything" checks against;
+   * `callings` alone can't answer that, since it only ever sees the
+   * narrow tracked vocabulary.
+   */
+  allCallings: string[];
   /**
    * Per-calling sustained dates, if the LCR export included them
    * (from "Callings with Date Sustained"). Keyed by canonical role
@@ -166,10 +181,14 @@ function splitCallingsWithDates(
  * Parses a pasted LCR callings-report TSV export. First non-blank line
  * is the header and drives column mapping - column order and
  * unrecognized columns are both handled. Every person is imported
- * regardless of calling - only their in-scope callings (if any) populate
- * `callings`, tallied via `withoutTrackedCalling` for rows that have
- * none. Rows missing Full Name, Birth Year, or a recognized Unit are
- * collected in `errors` with the source line number instead.
+ * regardless of calling - every calling in their cell lands in
+ * `allCallings` as LCR wrote it, while only the in-scope subset
+ * (stake / bishopric / EQ presidency) is also canonicalized into
+ * `callings`, which is what eligibility and holder-lookup logic
+ * matches against. `withoutTrackedCalling` tallies rows with no
+ * in-scope calling - not the same as having no calling at all. Rows
+ * missing Full Name, Birth Year, or a recognized Unit are collected in
+ * `errors` with the source line number instead.
  */
 export function parseLcrRoster(raw: string): LcrParseResult {
   const lines = raw.split(/\r?\n/);
@@ -274,11 +293,14 @@ export function parseLcrRoster(raw: string): LcrParseResult {
     // Split each "text (date)" chunk from LCR, run each text through
     // the vocabulary matcher, and pair every in-scope hit with its
     // chunk's sustained date. A chunk may hit multiple vocabulary
-    // roles (rare) - all of them get the same sustainedAt.
+    // roles (rare) - all of them get the same sustainedAt. Every
+    // chunk's own text, matched or not, also lands in allCallings.
     const chunks = splitCallingsWithDates(rawCallings);
     const callings: string[] = [];
+    const allCallings: string[] = [];
     const sustainedAt: Record<string, string> = {};
     for (const c of chunks) {
+      if (!allCallings.includes(c.text)) allCallings.push(c.text);
       const hits = extractInScopeCallings(c.text);
       for (const role of hits) {
         if (callings.includes(role)) continue;
@@ -308,6 +330,7 @@ export function parseLcrRoster(raw: string): LcrParseResult {
       unit: unitEntry.number,
       unitName: unitEntry.name,
       callings,
+      allCallings,
       sustainedAt,
       rawCallings,
       email,

@@ -595,6 +595,21 @@ export function requiresExistingCalling(callingName: string): boolean {
 }
 
 /**
+ * Whether a person currently serves in anything, tracked or not.
+ * `person.callings` alone can't answer this - it only ever holds the
+ * narrow in-scope vocabulary, so someone whose only calling is, say,
+ * Primary Teacher would show as empty there even though they clearly
+ * have a calling. `allCallings` (added later than `callings`, so older
+ * records may not have it yet) carries everything from the LCR cell
+ * as-is; fall back to `callings` when it's missing so a record that
+ * hasn't been re-imported since is at least as accurate as before,
+ * not worse.
+ */
+export function hasAnyCalling(person: Pick<Person, 'callings' | 'allCallings'>): boolean {
+  return (person.allCallings ?? person.callings ?? []).length > 0;
+}
+
+/**
  * Which priesthood advancement (if any) would close the gap between a
  * person's current office and a calling's TRUE requirement. Only the two
  * transitions the advancement flow tracks are ever suggested - a deeper

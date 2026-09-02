@@ -16,9 +16,9 @@ import { RosterSyncService } from '../../core/roster-sync.service';
       <p class="muted text-sm">
         Open the callings custom report in LCR, copy the rows you need, and paste them below.
         This never connects to LCR - it only parses text you've already copied. Everyone in the
-        paste is imported; only the calling shown against them is filtered down to stake,
-        bishopric/branch presidency, or elders quorum presidency roles, since those are the only
-        ones this app tracks.
+        paste is imported with every calling shown against them; stake, bishopric/branch
+        presidency, and elders quorum presidency roles are also recognized by name, which is what
+        drives calling/release eligibility and holder lookups elsewhere in the app.
       </p>
       <p class="muted text-sm">
         Your LCR custom report must include: <strong>Full Name</strong>,
@@ -86,7 +86,7 @@ import { RosterSyncService } from '../../core/roster-sync.service';
                     <th>Born</th>
                     <th>Unit</th>
                     <th>Office</th>
-                    <th>In-scope callings</th>
+                    <th>Callings</th>
                     <th>Email</th>
                   </tr>
                 </thead>
@@ -123,12 +123,17 @@ import { RosterSyncService } from '../../core/roster-sync.service';
                         }
                       </td>
                       <td data-label="Callings" class="text-sm">
-                        @for (c of row.callings; track c; let last = $last) {
-                          <span>{{ c }}</span>
+                        <!-- Bold marks the ones the app recognizes by name (see
+                             calling-authorities.ts) - those drive eligibility and
+                             holder lookups; the rest are informational only. -->
+                        @for (c of row.allCallings; track c; let last = $last) {
+                          <span [class.in-scope-calling]="row.callings.includes(c)">{{ c }}</span>
                           @if (row.sustainedAt[c]) {
                             <span class="muted"> ({{ row.sustainedAt[c] }})</span>
                           }
                           @if (!last) { <span> · </span> }
+                        } @empty {
+                          <span class="muted">—</span>
                         }
                       </td>
                       <td data-label="Email" class="muted text-sm">{{ row.email ?? '—' }}</td>
@@ -159,6 +164,7 @@ import { RosterSyncService } from '../../core/roster-sync.service';
         clip-path: inset(50%);
         white-space: nowrap;
       }
+      .in-scope-calling { font-weight: 600; }
       .pick {
         display: inline-flex;
         align-items: center;
@@ -240,6 +246,7 @@ export class RosterImportComponent {
           phone: r.phone,
           priesthoodOffice: r.priesthoodOffice,
           callings: r.callings,
+          allCallings: r.allCallings,
           sustainedAt: Object.keys(r.sustainedAt).length ? r.sustainedAt : undefined,
         });
       }

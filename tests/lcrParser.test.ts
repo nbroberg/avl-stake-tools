@@ -104,6 +104,23 @@ describe('parseLcrRoster', () => {
     expect(out.withoutTrackedCalling).toBe(1);
   });
 
+  it('captures every calling in allCallings, in-scope or not', () => {
+    const out = parseLcrRoster(
+      tsv(
+        // Out-of-scope only: callings stays empty, allCallings doesn't.
+        'Doe, Jane\t1985\tAsheville Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
+        // Mixed: both land in allCallings; only Bishop is canonicalized
+        // into callings.
+        'Smith, John\t1970\tAsheville Ward\t\t\t\t' +
+          'Ward Missionary (2 Feb 2024) Bishop (5 Mar 2026)\t',
+      ),
+    );
+    expect(out.rows[0].callings).toEqual([]);
+    expect(out.rows[0].allCallings).toEqual(['Primary Teacher']);
+    expect(out.rows[1].callings).toEqual(['Bishop']);
+    expect(out.rows[1].allCallings).toEqual(['Ward Missionary', 'Bishop']);
+  });
+
   it('reports missing Birth Year', () => {
     const out = parseLcrRoster(
       tsv('Doe, Jane\t\tAsheville Ward\t\t\t\tBishop\t'),

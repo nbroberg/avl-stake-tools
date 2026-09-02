@@ -16,6 +16,7 @@ import {
 import {
   PRIESTHOOD_REQUIREMENT_LABELS,
   eligibleCallees,
+  hasAnyCalling,
   isSingletonCalling,
   priesthoodRequirementFor,
   requiresExistingCalling,
@@ -221,10 +222,17 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
                           @if (!last) { <span class="sep"> · </span> }
                         }
                       </span>
-                    } @else {
-                      <span class="candidate-callings muted">
-                        No in-scope callings on record
+                    } @else if (p.allCallings && p.allCallings.length > 0) {
+                      <!-- Not the tracked vocabulary, so no highlight matching -
+                           just informational, e.g. Primary Teacher, Ward Missionary. -->
+                      <span class="candidate-callings">
+                        @for (c of p.allCallings; track c; let last = $last) {
+                          <span>{{ c }}</span>
+                          @if (!last) { <span class="sep"> · </span> }
+                        }
                       </span>
+                    } @else {
+                      <span class="candidate-callings muted">No calling on record</span>
                     }
                     <span class="candidate-meta">
                       {{ unitLabel(p.unit)
@@ -477,7 +485,7 @@ export class NewCallingComponent {
     if (!name) return this.candidatePool();
     const byPriesthood = eligibleCallees(name, this.candidatePool());
     if (!requiresExistingCalling(name) || this.includeNoCurrentCalling()) return byPriesthood;
-    return byPriesthood.filter((p) => (p.callings ?? []).length > 0);
+    return byPriesthood.filter(hasAnyCalling);
   });
 
   /** How many people got dropped by the current filter set, for the

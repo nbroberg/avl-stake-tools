@@ -40,12 +40,12 @@ export interface AppUser {
  * a stake's population where same-name-same-year collisions are
  * astronomically unlikely.
  *
- * Only the four narrow fields (name/unit/email/phone) plus a
- * lightweight `birthYear` (integer, no day/month) and the extracted
- * in-scope callings ever land here - not any of the sensitive
- * membership data (full birthdate, ordinances, priesthood office
- * history, marriage/sealing status, etc.) that an unfiltered LCR
- * export would carry.
+ * Only the four narrow fields (name/unit/email/phone), a lightweight
+ * `birthYear` (integer, no day/month), and the callings cell (both as
+ * canonicalized in-scope roles and as LCR's own text) ever land here -
+ * not any of the other sensitive membership data (full birthdate,
+ * ordinances, priesthood office history, marriage/sealing status,
+ * etc.) that an unfiltered LCR export would carry.
  */
 export interface Person {
   /** Slug from Full Name + Birth Year - same as the document id. */
@@ -84,12 +84,26 @@ export interface Person {
    */
   priesthoodOffice?: string;
   /**
-   * In-scope calling roles this person currently holds. Populated by the
-   * LCR import; drives the /scope report. Callings outside the
-   * presidency/bishopric/EQ vocabulary are dropped at parse time and
-   * never land here.
+   * In-scope calling roles this person currently holds, canonicalized
+   * to the tracked vocabulary. Populated by the LCR import; drives the
+   * /scope report and all workflow eligibility/holder-lookup logic
+   * (core/calling-authorities.ts), which needs exact-match role names
+   * to work against. Not the full picture of what this person serves
+   * in - see `allCallings`.
    */
   callings?: string[];
+  /**
+   * Every calling in the person's LCR callings cell, in-scope or not,
+   * as LCR's own text (Primary Teacher, Ward Missionary, Relief
+   * Society President, ...). Populated by the LCR import alongside
+   * `callings`. This is what "does this person currently serve in
+   * anything" checks against (see
+   * calling-authorities.requiresExistingCalling) - `callings` alone
+   * can't answer that, since it only ever sees the narrow tracked
+   * vocabulary. Not canonicalized, so don't match against it by exact
+   * role name the way `callings` is used.
+   */
+  allCallings?: string[];
   /**
    * When each of the above callings was sustained, as an ISO date
    * string (YYYY-MM-DD). Populated when the LCR export includes the

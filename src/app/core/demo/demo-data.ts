@@ -42,6 +42,10 @@ interface PersonSeed {
   /** LCR "Priesthood office"; '' means none on record. */
   office: string;
   callings: string[];
+  /** Every calling, in-scope or not - see Person.allCallings. Defaults
+   *  to `callings` when omitted, matching a legacy (pre-allCallings)
+   *  import. */
+  allCallings?: string[];
   email?: string;
   phone?: string;
 }
@@ -164,11 +168,16 @@ const SEEDS: PersonSeed[] = [
 
   // --- Roster-only members ---------------------------------------------
   // No in-scope calling: these never appear on Scope, but they DO show up
-  // as candidates on the New Calling form, which is the point.
+  // as candidates on the New Calling form, which is the point. The first
+  // two also carry an out-of-scope allCallings entry, exercising the
+  // "already has a calling, just not one we track" path - see
+  // calling-authorities.hasAnyCalling.
   { name: 'Jasper Nightingale', birthYear: 1985, unit: NORTHGATE, office: 'Elder',
-    callings: [], email: 'j.nightingale@example.com', phone: '555-0150' },
+    callings: [], allCallings: ['Primary Teacher'],
+    email: 'j.nightingale@example.com', phone: '555-0150' },
   { name: 'Oscar Templeton', birthYear: 1978, unit: NORTHGATE, office: 'High Priest',
-    callings: [], email: 'o.templeton@example.com' },
+    callings: [], allCallings: ['Ward Missionary', 'Sunday School Teacher'],
+    email: 'o.templeton@example.com' },
   { name: 'Ignatius Mbeki', birthYear: 1996, unit: NORTHGATE, office: 'Priest',
     callings: [] },
   { name: 'Cornelius Rasmussen', birthYear: 1991, unit: RIVERBEND, office: 'Elder',
@@ -200,6 +209,7 @@ export function demoPeople(): Person[] {
     phone: s.phone,
     priesthoodOffice: s.office,
     callings: s.callings.length ? s.callings : undefined,
+    allCallings: s.allCallings ?? (s.callings.length ? s.callings : undefined),
     active: true,
     createdAt: daysAgo(120),
     updatedAt: daysAgo(14),
