@@ -6,7 +6,7 @@ import type {
   CallingsService,
   NewCallingWorkflowInput,
 } from '../callings.service';
-import { DATE_FIELD_BY_STATUS } from '../calling-status';
+import { DATE_FIELD_BY_STATUS, getPreviousStatus } from '../calling-status';
 import { HC_QUORUM_REQUIRED } from '../quorum';
 import type {
   AppUser,
@@ -34,6 +34,7 @@ export class DemoCallingsService
       | 'advanceStatus'
       | 'updateNotes'
       | 'deleteWorkflow'
+      | 'rollbackStatus'
       | 'approveByHighCouncil'
       | 'withdrawHighCouncilApproval'
       | 'raiseHighCouncilConcern'
@@ -148,6 +149,46 @@ export class DemoCallingsService
 
   async deleteWorkflow(workflowId: string): Promise<void> {
     this.workflows$.next(this.workflows$.value.filter((w) => w.id !== workflowId));
+  }
+
+  async rollbackStatus(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'callingName' | 'status'>,
+    actor: AppUser,
+    note?: string,
+  ): Promise<void> {
+    const previousStatus = getPreviousStatus(
+      workflow.workflowType,
+      workflow.status,
+      workflow.callingName,
+    );
+    if (!previousStatus) return;
+    const now = Timestamp.now();
+    const dateField = DATE_FIELD_BY_STATUS[workflow.status];
+
+    this.patch(workflow.id, (w) => {
+      const next: CallingWorkflow = {
+        ...w,
+        status: previousStatus as CallingWorkflow['status'],
+        updatedBy: actor.firebaseUid,
+        updatedAt: now,
+      };
+      if (dateField) delete next[dateField];
+      if (workflow.status === 'interview_assigned') delete next.assignedTo;
+      if (workflow.status === 'set_apart') delete next.setApartBy;
+      if (workflow.status === 'complete') delete next.recordedDate;
+      return next;
+    });
+
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status: previousStatus,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note: note?.trim()
+        ? `Rolled back by the stake presidency. ${note.trim()}`
+        : 'Rolled back by the stake presidency.',
+    });
   }
 
   async approveByHighCouncil(workflowId: string, actor: AppUser): Promise<void> {

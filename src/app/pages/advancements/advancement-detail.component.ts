@@ -6,11 +6,12 @@ import { map, of, switchMap } from 'rxjs';
 import { PriesthoodAdvancementsService } from '../../core/priesthood-advancements.service';
 import { PeopleService } from '../../core/people.service';
 import { formatTimestamp } from '../../core/calling-status';
-import { getNextStatuses } from '../../core/advancement-status';
+import { getNextStatuses, getPreviousStatus } from '../../core/advancement-status';
 import {
   canAdvanceStatus,
   canDeleteWorkflow,
   canEditNotes,
+  canRollbackStatus,
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
@@ -232,6 +233,36 @@ import {
           <p class="muted text-sm">This workflow is complete.</p>
         }
 
+        @if (canRollbackStatus(authService.appUser())) {
+          @if (previousStatus(); as prev) {
+            <div class="card stack rollback-zone">
+              @if (confirmingRollback()) {
+                <span class="text-sm">
+                  Roll back to <strong>{{ statusLabels[prev] ?? prev }}</strong>? This undoes the
+                  most recent status change - the step being undone stays visible in the history
+                  below.
+                </span>
+                <div class="row">
+                  <button class="btn btn-primary" [disabled]="busy()" (click)="rollback(w)">
+                    Yes, roll back
+                  </button>
+                  <button class="btn" [disabled]="busy()" (click)="confirmingRollback.set(false)">
+                    Cancel
+                  </button>
+                </div>
+              } @else {
+                <button
+                  class="btn btn-responsive"
+                  [disabled]="busy()"
+                  (click)="confirmingRollback.set(true)"
+                >
+                  Roll back to {{ statusLabels[prev] ?? prev }}
+                </button>
+              }
+            </div>
+          }
+        }
+
         <div class="card stack">
           <strong>Notes</strong>
           <textarea
@@ -327,6 +358,9 @@ import {
       .danger-zone {
         border: 1px solid var(--danger);
       }
+      .rollback-zone {
+        border: 1px solid var(--warn);
+      }
       @media (max-width: 639.98px) {
         .history .note-empty { display: none; }
       }
@@ -371,6 +405,7 @@ export class AdvancementDetailComponent {
   protected readonly authService = inject(AuthService);
   protected readonly canEditNotes = canEditNotes;
   protected readonly canDeleteWorkflow = canDeleteWorkflow;
+  protected readonly canRollbackStatus = canRollbackStatus;
   protected readonly isHighCouncil = isHighCouncil;
   protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
@@ -444,6 +479,11 @@ export class AdvancementDetailComponent {
     return w ? getNextStatuses(w.status) : [];
   });
 
+  protected readonly previousStatus = computed(() => {
+    const w = this.workflow();
+    return w ? getPreviousStatus(w.status) : null;
+  });
+
   protected readonly hc = computed(() => {
     const w = this.workflow();
     return w
@@ -479,6 +519,7 @@ export class AdvancementDetailComponent {
   protected readonly pendingOrdainedBy = signal('');
   protected readonly busy = signal(false);
   protected readonly confirmingApproval = signal(false);
+  protected readonly confirmingRollback = signal(false);
   protected readonly confirmingDelete = signal(false);
 
   constructor() {
@@ -582,6 +623,18 @@ export class AdvancementDetailComponent {
     this.busy.set(true);
     try {
       await this.advancementsService.updateNotes(workflowId, this.notes(), actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async rollback(w: PriesthoodAdvancementWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.advancementsService.rollbackStatus(w, actor);
+      this.confirmingRollback.set(false);
     } finally {
       this.busy.set(false);
     }

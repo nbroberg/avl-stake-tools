@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getNextStatuses } from '../src/app/core/calling-status';
+import { getNextStatuses, getPreviousStatus } from '../src/app/core/calling-status';
 
 describe('getNextStatuses (calling lifecycle)', () => {
   it('walks the full calling lifecycle in order', () => {
@@ -80,5 +80,52 @@ describe('getNextStatuses (calling lifecycle)', () => {
       'recorded_in_lcr',
       'complete',
     ]);
+  });
+});
+
+describe('getPreviousStatus (calling lifecycle)', () => {
+  it('returns null at the very first status', () => {
+    expect(getPreviousStatus('calling', 'proposed')).toBeNull();
+  });
+
+  it('returns null for an unknown status', () => {
+    expect(getPreviousStatus('calling', 'bogus')).toBeNull();
+  });
+
+  it('walks the full calling lifecycle backward', () => {
+    const path: string[] = ['complete'];
+    while (true) {
+      const prev = getPreviousStatus('calling', path[path.length - 1]);
+      if (!prev) break;
+      path.push(prev);
+    }
+    expect(path).toEqual([
+      'complete',
+      'set_apart',
+      'sustained',
+      'accepted',
+      'calling_extended',
+      'interview_assigned',
+      'high_council_approved',
+      'presidency_approved',
+      'proposed',
+    ]);
+  });
+
+  it('skips the never-persisted recorded_in_lcr step when rolling back from complete', () => {
+    // advanceStatus() finalizes straight to `complete`, so `recorded_in_lcr`
+    // is never a workflow's actual status - rolling back must land on
+    // set_apart, not on a status that was never really there.
+    expect(getPreviousStatus('calling', 'complete')).toBe('set_apart');
+  });
+
+  it('skips high_council_approved for callings that do not need SP+HC approval', () => {
+    expect(getPreviousStatus('calling', 'interview_assigned', 'Elders Quorum Secretary')).toBe(
+      'presidency_approved',
+    );
+  });
+
+  it('walks the release lifecycle backward, skipping recorded_in_lcr', () => {
+    expect(getPreviousStatus('release', 'complete')).toBe('sustained');
   });
 });

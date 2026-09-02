@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map, of, switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
-import { formatTimestamp, getNextStatuses } from '../../core/calling-status';
+import { formatTimestamp, getNextStatuses, getPreviousStatus } from '../../core/calling-status';
 import {
   canAdvanceStatus,
   canDeleteWorkflow,
   canEditNotes,
+  canRollbackStatus,
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
@@ -350,6 +351,36 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
           <p class="muted text-sm">This workflow is complete.</p>
         }
 
+        @if (canRollbackStatus(authService.appUser())) {
+          @if (previousStatus(); as prev) {
+            <div class="card stack rollback-zone">
+              @if (confirmingRollback()) {
+                <span class="text-sm">
+                  Roll back to <strong>{{ labelsFor(w)[prev] ?? prev }}</strong>? This undoes the
+                  most recent status change - the step being undone stays visible in the history
+                  below.
+                </span>
+                <div class="row">
+                  <button class="btn btn-primary" [disabled]="busy()" (click)="rollback(w)">
+                    Yes, roll back
+                  </button>
+                  <button class="btn" [disabled]="busy()" (click)="confirmingRollback.set(false)">
+                    Cancel
+                  </button>
+                </div>
+              } @else {
+                <button
+                  class="btn btn-responsive"
+                  [disabled]="busy()"
+                  (click)="confirmingRollback.set(true)"
+                >
+                  Roll back to {{ labelsFor(w)[prev] ?? prev }}
+                </button>
+              }
+            </div>
+          }
+        }
+
         <div class="card stack">
           <strong>Notes</strong>
           <textarea
@@ -474,6 +505,9 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
       .danger-zone {
         border: 1px solid var(--danger);
       }
+      .rollback-zone {
+        border: 1px solid var(--warn);
+      }
       @media (max-width: 639.98px) {
         /* A cell with no note would otherwise render as an empty stacked row. */
         .history .note-empty { display: none; }
@@ -485,6 +519,7 @@ export class CallingDetailComponent {
   protected readonly authService = inject(AuthService);
   protected readonly canEditNotes = canEditNotes;
   protected readonly canDeleteWorkflow = canDeleteWorkflow;
+  protected readonly canRollbackStatus = canRollbackStatus;
   protected readonly isHighCouncil = isHighCouncil;
   protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
@@ -586,6 +621,11 @@ export class CallingDetailComponent {
     return getNextStatuses(w.workflowType, w.status, w.callingName);
   });
 
+  protected readonly previousStatus = computed(() => {
+    const w = this.workflow();
+    return w ? getPreviousStatus(w.workflowType, w.status, w.callingName) : null;
+  });
+
   /**
    * A stake-level workflow (no `unit`) one step away from `sustained`
    * needs a sustaining vote in every ward/branch before it can advance -
@@ -657,6 +697,7 @@ export class CallingDetailComponent {
   protected readonly pendingSetApartBy = signal('');
   protected readonly busy = signal(false);
   protected readonly confirmingApproval = signal(false);
+  protected readonly confirmingRollback = signal(false);
   protected readonly confirmingDelete = signal(false);
 
   constructor() {
@@ -814,6 +855,18 @@ export class CallingDetailComponent {
     this.busy.set(true);
     try {
       await this.callingsService.updateNotes(workflowId, this.notes(), actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async rollback(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.rollbackStatus(w, actor);
+      this.confirmingRollback.set(false);
     } finally {
       this.busy.set(false);
     }

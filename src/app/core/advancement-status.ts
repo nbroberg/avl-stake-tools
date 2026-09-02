@@ -11,6 +11,18 @@ export function getNextStatuses(currentStatus: string): string[] {
   return [ADVANCEMENT_STATUS_ORDER[idx + 1]];
 }
 
+/**
+ * See calling-status.ts's getPreviousStatus - same reasoning, including
+ * filtering out `recorded_in_lcr`, which PriesthoodAdvancementsService also
+ * collapses straight into `complete` and never persists on its own.
+ */
+export function getPreviousStatus(currentStatus: string): string | null {
+  const order = ADVANCEMENT_STATUS_ORDER.filter((s) => s !== 'recorded_in_lcr');
+  const idx = order.indexOf(currentStatus as never);
+  if (idx <= 0) return null;
+  return order[idx - 1];
+}
+
 /** Maps a status to the PriesthoodAdvancementWorkflow date field it should stamp. */
 export const DATE_FIELD_BY_ADVANCEMENT_STATUS: Record<
   string,

@@ -5,6 +5,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   limit,
   onSnapshot,
@@ -18,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { db } from './firebase';
-import { DATE_FIELD_BY_ADVANCEMENT_STATUS } from './advancement-status';
+import { DATE_FIELD_BY_ADVANCEMENT_STATUS, getPreviousStatus } from './advancement-status';
 import { HC_QUORUM_REQUIRED } from './quorum';
 import { RosterSyncService } from './roster-sync.service';
 import type {
@@ -172,6 +173,39 @@ export class PriesthoodAdvancementsService {
     } satisfies WithFieldValue<Omit<AdvancementHistoryEntry, 'id'>>);
 
     if (finalizes) await this.rosterSync.flagRequired(actor);
+  }
+
+  /** See CallingsService.rollbackStatus - identical semantics, minus the
+   *  interview_assigned/set_apart fields this ladder doesn't have; it clears
+   *  ordainedBy instead when undoing arrival at `ordained`. */
+  async rollbackStatus(
+    workflow: Pick<PriesthoodAdvancementWorkflow, 'id' | 'status'>,
+    actor: AppUser,
+    note?: string,
+  ): Promise<void> {
+    const previousStatus = getPreviousStatus(workflow.status);
+    if (!previousStatus) return;
+
+    const dateField = DATE_FIELD_BY_ADVANCEMENT_STATUS[workflow.status];
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status: previousStatus,
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+      ...(dateField ? { [dateField]: deleteField() } : {}),
+      ...(workflow.status === 'ordained' ? { ordainedBy: deleteField() } : {}),
+      ...(workflow.status === 'complete' ? { recordedDate: deleteField() } : {}),
+    });
+
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status: previousStatus,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: note?.trim()
+        ? `Rolled back by the stake presidency. ${note.trim()}`
+        : 'Rolled back by the stake presidency.',
+    } satisfies WithFieldValue<Omit<AdvancementHistoryEntry, 'id'>>);
   }
 
   async updateNotes(workflowId: string, notes: string, actor: AppUser): Promise<void> {

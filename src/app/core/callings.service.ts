@@ -5,6 +5,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   limit,
   onSnapshot,
@@ -18,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { db } from './firebase';
-import { DATE_FIELD_BY_STATUS } from './calling-status';
+import { DATE_FIELD_BY_STATUS, getPreviousStatus } from './calling-status';
 import { HC_QUORUM_REQUIRED } from './quorum';
 import { RosterSyncService } from './roster-sync.service';
 import { completesSustaining } from './sunday-visit';
@@ -182,6 +183,54 @@ export class CallingsService {
     } satisfies WithFieldValue<Omit<CallingStatusHistoryEntry, 'id'>>);
 
     if (finalizes) await this.rosterSync.flagRequired(actor);
+  }
+
+  /**
+   * Undo the most recent status advance - for a mis-click or a step taken
+   * out of order. Clears the date field the last advance stamped, plus any
+   * actor field tied 1:1 to arriving at that status (assignedTo,
+   * setApartBy), so the detail page doesn't keep showing stale "assigned
+   * to"/"set apart by" info for a step that's been walked back. HC vote
+   * arrays and the sustaining checklist are left alone - they're a record
+   * of real events that already happened, not artifacts of the status
+   * field itself.
+   */
+  async rollbackStatus(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'callingName' | 'status'>,
+    actor: AppUser,
+    note?: string,
+  ): Promise<void> {
+    const previousStatus = getPreviousStatus(
+      workflow.workflowType,
+      workflow.status,
+      workflow.callingName,
+    );
+    if (!previousStatus) return;
+
+    const dateField = DATE_FIELD_BY_STATUS[workflow.status];
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status: previousStatus,
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+      ...(dateField ? { [dateField]: deleteField() } : {}),
+      ...(workflow.status === 'interview_assigned' ? { assignedTo: deleteField() } : {}),
+      ...(workflow.status === 'set_apart' ? { setApartBy: deleteField() } : {}),
+      // `complete` collapses the never-persisted `recorded_in_lcr` step -
+      // the finalizing write in advanceStatus() stamps both recordedDate
+      // and completedDate at once, so undoing it has to clear both.
+      ...(workflow.status === 'complete' ? { recordedDate: deleteField() } : {}),
+    });
+
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status: previousStatus,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: note?.trim()
+        ? `Rolled back by the stake presidency. ${note.trim()}`
+        : 'Rolled back by the stake presidency.',
+    } satisfies WithFieldValue<Omit<CallingStatusHistoryEntry, 'id'>>);
   }
 
   async updateNotes(workflowId: string, notes: string, actor: AppUser): Promise<void> {

@@ -44,6 +44,25 @@ export function getNextStatuses(
   return [order[idx + 1]];
 }
 
+/**
+ * The status one step before `currentStatus`, or null when there isn't one
+ * (already at `proposed`, or the status isn't recognized). `recorded_in_lcr`
+ * is filtered out of the order first: CallingsService.advanceStatus never
+ * actually persists it as a workflow's `status` - advancing to it finalizes
+ * straight to `complete` in the same write (see its `finalizes` handling) -
+ * so it would never be a real rollback target either.
+ */
+export function getPreviousStatus(
+  workflowType: CallingWorkflowType,
+  currentStatus: string,
+  callingName?: string,
+): string | null {
+  const order = statusOrderFor(workflowType, callingName).filter((s) => s !== 'recorded_in_lcr');
+  const idx = order.indexOf(currentStatus);
+  if (idx <= 0) return null;
+  return order[idx - 1];
+}
+
 /** Maps a status to the CallingWorkflow date field it should stamp, if any. */
 export const DATE_FIELD_BY_STATUS: Record<string, keyof CallingWorkflow | undefined> = {
   proposed: 'proposedDate',

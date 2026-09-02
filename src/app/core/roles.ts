@@ -40,6 +40,11 @@ export function canDeleteWorkflow(user: AppUser | null): boolean {
   return isPresidency(user);
 }
 
+/** Only the presidency can roll a workflow back a step - see canAdvanceStatus. */
+export function canRollbackStatus(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
+
 /**
  * Whether the caller may advance a workflow from `from` to `to`.
  * - Presidency: any legal transition.
