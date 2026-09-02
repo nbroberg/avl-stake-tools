@@ -128,8 +128,9 @@ to do once it's recorded. It also flips `rosterSync/status` to
 banner on the dashboard, since the `people` collection has no live LCR
 connection and may now be behind. A completed roster import clears the
 flag automatically - both the in-app paste importer
-(`pages/people/roster-import.component.ts`) and the `tools/lcr-client`
-CLI do this on a successful write - since an import actually catching
+(`pages/people/roster-import.component.ts`) and the `lcr-client` CLI
+(a separate, sibling repo - not part of this checkout) do this on a
+successful write - since an import actually catching
 the roster up is a real, observable event, unlike an LCR-side change
 happening at all. The dashboard also has a manual "Mark roster synced"
 button as a fallback for anything outside those two paths.
