@@ -10,6 +10,7 @@ coverage
 firebase-debug.log
 firestore-debug.log
 .angular
+.claude/settings.local.json
 
 # Generated at build time by scripts/generate-environment.mjs from
 # .env.local (local) or GitHub Actions secrets (CI). Not committed so
