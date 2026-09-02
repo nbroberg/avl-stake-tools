@@ -92,6 +92,12 @@ import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/
           <strong>Units</strong>
           <div class="muted text-sm">See what's outstanding per unit, and record it there.</div>
         </a>
+        <a class="list-item" routerLink="/hc-approvals">
+          <strong>HC Approvals</strong>
+          <div class="muted text-sm">
+            Everything currently awaiting a High Council vote, stake-wide.
+          </div>
+        </a>
         <a class="list-item" routerLink="/callings">
           <strong>Callings &amp; Releases</strong>
           <div class="muted text-sm">Track proposed callings and releases through completion.</div>
