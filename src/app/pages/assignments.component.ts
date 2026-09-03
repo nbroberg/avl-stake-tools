@@ -19,6 +19,7 @@ import {
 } from '../core/advancement-review';
 import { isPresidency } from '../core/roles';
 import { workflowScopeLabel } from '../core/units';
+import { formatTimestamp } from '../core/calling-status';
 import type { HcTally } from '../core/hc-vote';
 import {
   ADVANCEMENT_TYPE_LABELS,
@@ -43,8 +44,15 @@ interface InterviewAssignmentRow extends PersonalRow {
   assignedTo: string | null;
 }
 
+interface ProposedRow extends PersonalRow {
+  proposedDate: string;
+}
+
 /** The one status at which a calling has a live interview assignment. */
 const INTERVIEW_ASSIGNED_STATUS = 'interview_assigned';
+
+/** The status a workflow starts at, before the presidency's own first review. */
+const PROPOSED_STATUS = 'proposed';
 
 @Component({
   selector: 'app-assignments',
@@ -87,6 +95,26 @@ const INTERVIEW_ASSIGNED_STATUS = 'interview_assigned';
       @if (isPresidency(authService.appUser())) {
         <div class="stack">
           <strong>Outstanding across the stake</strong>
+
+          <div class="stack">
+            <span class="text-sm muted">Proposed, awaiting your review</span>
+            @if (allProposed().length === 0) {
+              <p class="muted">Nothing is currently proposed.</p>
+            } @else {
+              @for (row of allProposed(); track row.id) {
+                <div class="card row-between">
+                  <div>
+                    <strong>{{ row.title }}</strong>
+                    <p class="muted text-sm" style="margin: 0">{{ row.subtitle }}</p>
+                  </div>
+                  <div style="text-align: right">
+                    <p class="muted text-sm" style="margin: 0 0 0.4rem">Proposed {{ row.proposedDate }}</p>
+                    <a class="btn btn-responsive" [routerLink]="row.link">Review</a>
+                  </div>
+                </div>
+              }
+            }
+          </div>
 
           <div class="stack">
             <span class="text-sm muted">High Council votes</span>
@@ -240,6 +268,35 @@ export class AssignmentsComponent {
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
       }));
+  });
+
+  /**
+   * Every calling/release/advancement currently at `proposed`, stake-wide -
+   * the presidency's own first-review queue, before anything has been
+   * approved or sent to the high council. No history lookup needed - like
+   * allInterviews(), everything shown here (proposedDate) is already
+   * denormalized directly on the workflow.
+   */
+  protected readonly allProposed = computed<ProposedRow[]>(() => {
+    const callingRows: ProposedRow[] = this.workflows()
+      .filter((w) => w.status === PROPOSED_STATUS)
+      .map((w) => ({
+        id: w.id,
+        title: w.callingName,
+        subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
+        link: ['/callings', w.id],
+        proposedDate: formatTimestamp(w.proposedDate),
+      }));
+    const advancementRows: ProposedRow[] = this.advancementWorkflows()
+      .filter((w) => w.status === PROPOSED_STATUS)
+      .map((w) => ({
+        id: w.id,
+        title: ADVANCEMENT_TYPE_LABELS[w.advancementType],
+        subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
+        link: ['/advancements', w.id],
+        proposedDate: formatTimestamp(w.proposedDate),
+      }));
+    return [...callingRows, ...advancementRows];
   });
 
   /**

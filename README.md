@@ -293,25 +293,32 @@ change.
 
 ### 3. Create the presidency and high council user records
 
-The app cannot grant itself the first role — one document has to be
-created by hand for each user:
+The app cannot grant itself the first role. The one step that can't be
+automated: each person must sign in once (they land on `/access-denied`)
+so a Firebase Auth UID exists for them. After that:
 
-1. Ask each presidency member and high councilor to sign in once (they
-   land on `/access-denied`). Copy each Firebase UID from the console
-   under Authentication → Users.
-2. In the Firebase console, create a document at `users/{uid}` for each
-   with fields:
-   ```
-   firebaseUid: "<uid>"       (string)
-   email: "<their email>"     (string)
-   displayName: "<name>"      (string)
-   role: "stake_presidency"   (string; or "high_council")
-   active: true               (boolean)
-   ```
-3. Reload the app — they should now see the dashboard.
+- **Automated** (recommended): `../lcr-client`'s `provision-users.ts`
+  takes a JSON whitelist of `{ email, displayName, role, active? }`,
+  looks up each email's Firebase Auth UID, and creates/updates
+  `users/{uid}` to match — reporting who's still waiting to sign in.
+  Re-running is always safe (idempotent upsert), and it's also how role
+  changes and deactivation (`active: false`) are done going forward. See
+  `../lcr-client/README.md`, "Approving sign-ins."
+- **Manual** (no `lcr-client` checkout / one-off account): copy the
+  Firebase UID from the console under Authentication → Users, then create
+  a document at `users/{uid}` with fields:
+  ```
+  firebaseUid: "<uid>"       (string)
+  email: "<their email>"     (string)
+  displayName: "<name>"      (string)
+  role: "stake_presidency"   (string; or "high_council")
+  active: true               (boolean)
+  ```
 
-There is no in-app user management UI in this POC. All role changes
-happen in the Firebase Console.
+Either way, no reload is needed — the app's Firestore listener picks up
+the new doc live and `/access-denied` navigates itself to the dashboard.
+
+There is no in-app user management UI in this POC.
 
 ### 4. Local development
 
