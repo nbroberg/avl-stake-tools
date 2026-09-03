@@ -36,7 +36,7 @@ const TEXT_INPUT_TYPES = new Set([
           >Dashboard</a
         >
         <a routerLink="/units" routerLinkActive="active">Units</a>
-        <a routerLink="/hc-approvals" routerLinkActive="active">Approvals</a>
+        <a routerLink="/assignments" routerLinkActive="active">Assignments</a>
         <a routerLink="/callings" routerLinkActive="active">Callings</a>
         <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
         <a routerLink="/diagnostics" routerLinkActive="active">Diagnostics</a>

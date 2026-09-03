@@ -58,7 +58,7 @@ import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/
            answer is "nothing". -->
       @if (isHighCouncil(authService.appUser())) {
         @if (awaitingCount() > 0) {
-          <a class="call-to-action" routerLink="/callings">
+          <a class="call-to-action" routerLink="/assignments">
             <div class="cta-count">{{ awaitingCount() }}</div>
             <strong>
               {{ awaitingCount() === 1 ? 'proposal awaits' : 'proposals await' }} your response
@@ -69,7 +69,7 @@ import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/
           </a>
         }
         @if (awaitingAdvancementCount() > 0) {
-          <a class="call-to-action" routerLink="/advancements">
+          <a class="call-to-action" routerLink="/assignments">
             <div class="cta-count">{{ awaitingAdvancementCount() }}</div>
             <strong>
               priesthood {{ awaitingAdvancementCount() === 1 ? 'advancement awaits' : 'advancements await' }}
@@ -92,10 +92,10 @@ import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/
           <strong>Units</strong>
           <div class="muted text-sm">See what's outstanding per unit, and record it there.</div>
         </a>
-        <a class="list-item" routerLink="/hc-approvals">
-          <strong>HC Approvals</strong>
+        <a class="list-item" routerLink="/assignments">
+          <strong>Assignments</strong>
           <div class="muted text-sm">
-            Everything currently awaiting a High Council vote, stake-wide.
+            Your outstanding votes and interviews, plus everything outstanding stake-wide.
           </div>
         </a>
         <a class="list-item" routerLink="/callings">

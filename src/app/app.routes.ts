@@ -5,7 +5,7 @@ import { AccessDeniedComponent } from './auth/access-denied.component';
 import { DiagnosticsComponent } from './pages/diagnostics.component';
 import { LayoutComponent } from './layout/layout.component';
 import { DashboardComponent } from './pages/dashboard.component';
-import { HcApprovalsComponent } from './pages/hc-approvals.component';
+import { AssignmentsComponent } from './pages/assignments.component';
 import { CallingsListComponent } from './pages/callings/callings-list.component';
 import { NewCallingComponent } from './pages/callings/new-calling.component';
 import { CallingDetailComponent } from './pages/callings/calling-detail.component';
@@ -27,7 +27,7 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', component: DashboardComponent },
-      { path: 'hc-approvals', component: HcApprovalsComponent },
+      { path: 'assignments', component: AssignmentsComponent },
       { path: 'callings', component: CallingsListComponent },
       { path: 'callings/new', component: NewCallingComponent },
       { path: 'callings/:id', component: CallingDetailComponent },
