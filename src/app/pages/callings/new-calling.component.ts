@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { switchMap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { PeopleService } from '../../core/people.service';
@@ -49,7 +49,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
 @Component({
   selector: 'app-new-calling',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   template: `
     <div class="stack">
       <h1>New {{ workflowType() === 'release' ? 'Release' : 'Calling' }}</h1>
@@ -90,8 +90,8 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
           </select>
           @if (workflowType() === 'release' && displayedCallingGroups().length === 0) {
             <span class="text-sm muted">
-              No in-scope callings are filled in the current roster. Import from
-              <a routerLink="/people">Roster</a> first, or switch to New Calling.
+              No in-scope callings are filled in the current roster. Import the roster from LCR
+              first, or switch to New Calling.
             </span>
           } @else if (workflowType() === 'calling' && callingName() && priesthoodLabel(); as label) {
             <span class="text-sm muted">
@@ -273,7 +273,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
                 @if (unitScope() !== 'none' && !unit()) {
                   Pick a {{ unitPlaceholder() }} above to narrow the list.
                 } @else {
-                  Import from <a routerLink="/people">Roster</a> with the LCR "Priesthood office"
+                  Re-import from LCR with the "Priesthood office"
                   column included, or pick a different calling{{
                     unitScope() !== 'none' ? '/' + unitPlaceholder() : ''
                   }}.
@@ -286,7 +286,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
               </span>
             } @else {
               <span class="text-sm muted">
-                Don't see them? Add via <a routerLink="/people">Roster</a> first.
+                Don't see them? Import them from LCR first.
               </span>
             }
           }

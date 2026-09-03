@@ -12,9 +12,6 @@ import { CallingDetailComponent } from './pages/callings/calling-detail.componen
 import { AdvancementsListComponent } from './pages/advancements/advancements-list.component';
 import { NewAdvancementComponent } from './pages/advancements/new-advancement.component';
 import { AdvancementDetailComponent } from './pages/advancements/advancement-detail.component';
-import { PeopleListComponent } from './pages/people/people-list.component';
-import { RosterImportComponent } from './pages/people/roster-import.component';
-import { ScopeComponent } from './pages/scope/scope.component';
 import { UnitsComponent } from './pages/units.component';
 
 export const routes: Routes = [
@@ -38,9 +35,6 @@ export const routes: Routes = [
       { path: 'advancements', component: AdvancementsListComponent },
       { path: 'advancements/new', component: NewAdvancementComponent },
       { path: 'advancements/:id', component: AdvancementDetailComponent },
-      { path: 'scope', component: ScopeComponent },
-      { path: 'people', component: PeopleListComponent },
-      { path: 'people/import', component: RosterImportComponent },
     ],
   },
 

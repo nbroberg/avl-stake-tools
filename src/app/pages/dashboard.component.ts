@@ -106,14 +106,6 @@ import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/
           <strong>Priesthood Advancements</strong>
           <div class="muted text-sm">Track Priest→Elder and Elder→High Priest approvals.</div>
         </a>
-        <a class="list-item" routerLink="/scope">
-          <strong>Stake Scope</strong>
-          <div class="muted text-sm">Who currently holds each stake, bishopric and EQ calling.</div>
-        </a>
-        <a class="list-item" routerLink="/people">
-          <strong>Roster</strong>
-          <div class="muted text-sm">Import from LCR and browse local Person records.</div>
-        </a>
         <a class="list-item" routerLink="/diagnostics">
           <strong>Diagnostics</strong>
           <div class="muted text-sm">Check Firebase Auth and Firestore connectivity.</div>

@@ -9,7 +9,7 @@ import type { StakeUnit } from '../units';
  * can't collide with a real Church-issued number. The shape deliberately
  * mirrors the real list - seven wards, four branches, one of them a
  * language-group branch with a parenthetical - because that parenthetical
- * is a genuine formatting edge the Scope report has to render.
+ * is a genuine formatting edge unitLabel() has to render.
  */
 export const DEMO_UNITS: readonly StakeUnit[] = [
   { number: '900101', name: 'Northgate Ward',                 kind: 'ward'   },

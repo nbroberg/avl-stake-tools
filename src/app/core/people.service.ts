@@ -19,7 +19,7 @@ const COLLECTION = 'people';
 
 /** Everything the LCR import (or any other creator) needs to supply. */
 export interface UpsertPersonInput {
-  /** Doc id - slug from Full Name + Birth Year (see lcr-parser). */
+  /** Doc id - slug from Full Name + Birth Year. */
   id: string;
   name: string;
   fullName: string;
@@ -59,9 +59,9 @@ export class PeopleService {
    * People with at least one in-scope calling on record - the release
    * candidate pool is always a subset of these, so this is the whole
    * roster the Release form actually needs, typically a small fraction
-   * of the full membership. The LCR import always writes `callings` as
-   * an array, even an empty one (see lcr-parser.ts), never leaving it
-   * unset, so the inequality filter reliably excludes only the people
+   * of the full membership. Callers writing a person's `callings` are
+   * expected to always write an array, even an empty one, never leaving
+   * it unset, so the inequality filter reliably excludes only the people
    * who truly hold nothing.
    *
    * No `orderBy` here on purpose - Firestore requires an inequality

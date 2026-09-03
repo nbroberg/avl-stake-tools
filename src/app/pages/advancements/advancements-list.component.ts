@@ -151,11 +151,8 @@ export class AdvancementsListComponent {
   /** Firestore returned fewer docs than asked for, so there's nothing more to page in. */
   protected readonly reachedEnd = computed(() => (this.workflows()?.length ?? 0) < this.pageSize());
 
-  /**
-   * Guards against the load-more sentinel re-firing before the previous
-   * bump has rendered - see PeopleListComponent.loadingMore for why this
-   * is needed.
-   */
+  /** Guards against the load-more sentinel re-firing before the previous
+   *  bump has rendered - see CallingsListComponent.loadingMore for why. */
   protected readonly loadingMore = signal(false);
 
   protected loadMore(): void {

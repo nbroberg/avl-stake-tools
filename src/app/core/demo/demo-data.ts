@@ -16,14 +16,13 @@ import type {
  * can collide with a real person or reach a real line.
  *
  * The unit numbers ARE the real vocabulary from core/units.ts, because
- * the importer, the Scope report and the New Calling form all validate
- * against it - mock units would only exercise the failure paths.
+ * the LCR import and the New Calling form both validate against it -
+ * mock units would only exercise the failure paths.
  *
  * The data is shaped to put the UI through its paces rather than to look
- * tidy: some slots are deliberately vacant so the Scope report renders
- * its gap markers, offices vary so the New Calling form's priesthood
- * filtering has something to filter, and the workflows below sit at
- * several different points in the status ladder.
+ * tidy: some slots are deliberately vacant, offices vary so the New
+ * Calling form's priesthood filtering has something to filter, and the
+ * workflows below sit at several different points in the status ladder.
  */
 
 // Invented unit numbers from core/demo/demo-units.ts, which replaces the
@@ -166,12 +165,11 @@ const SEEDS: PersonSeed[] = [
   { name: 'Casimir Adeyemi', birthYear: 1994, unit: CEDAR_HOLLOW, office: 'Elder',
     callings: ['Branch Clerk'] },
 
-  // --- Roster-only members ---------------------------------------------
-  // No in-scope calling: these never appear on Scope, but they DO show up
-  // as candidates on the New Calling form, which is the point. The first
-  // two also carry an out-of-scope allCallings entry, exercising the
-  // "already has a calling, just not one we track" path - see
-  // calling-authorities.hasAnyCalling.
+  // --- Members with no tracked calling -----------------------------------
+  // No in-scope calling, but they DO show up as candidates on the New
+  // Calling form, which is the point. The first two also carry an
+  // out-of-scope allCallings entry, exercising the "already has a calling,
+  // just not one we track" path - see calling-authorities.hasAnyCalling.
   { name: 'Jasper Nightingale', birthYear: 1985, unit: NORTHGATE, office: 'Elder',
     callings: [], allCallings: ['Primary Teacher'],
     email: 'j.nightingale@example.com', phone: '555-0150' },

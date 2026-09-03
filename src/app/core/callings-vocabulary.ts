@@ -321,15 +321,6 @@ export function bucketOf(role: string): Bucket | null {
   return null;
 }
 
-/** True when a person's callings list contains any of these role names. */
-export function hasAnyRole(callings: string[] | undefined, roles: string[]): boolean {
-  if (!callings || callings.length === 0) return false;
-  for (const r of roles) {
-    if (callings.includes(r)) return true;
-  }
-  return false;
-}
-
 /**
  * What kind of unit a calling belongs to. Drives the New Calling form's
  * Unit dropdown:

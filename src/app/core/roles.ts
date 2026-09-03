@@ -20,11 +20,6 @@ export function isHighCouncil(user: AppUser | null): boolean {
   return hasRole(user, ['high_council']);
 }
 
-/** Roster is read by everyone signed in; only the presidency edits it. */
-export function canManageRoster(user: AppUser | null): boolean {
-  return isPresidency(user);
-}
-
 /** Only the presidency can propose new calling/release workflows. */
 export function canCreateWorkflow(user: AppUser | null): boolean {
   return isPresidency(user);

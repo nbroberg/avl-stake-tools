@@ -167,8 +167,13 @@ export class CallingsListComponent {
 
   /**
    * Guards against the load-more sentinel re-firing before the previous
-   * bump has rendered - see PeopleListComponent.loadingMore for why this
-   * is needed.
+   * bump has rendered. The sentinel's IntersectionObserver doesn't only
+   * fire on the transition into view - it can fire again whenever the
+   * sentinel's position shifts while still visible, which happens on every
+   * bump as new rows push it further down. Without this guard, a burst of
+   * those firings before Firestore responds would each bump the page size,
+   * cascading straight to the whole collection instead of one page at a
+   * time.
    */
   protected readonly loadingMore = signal(false);
 

@@ -16,16 +16,6 @@ const MIN_PAGE_SIZE = 6;
 const MAX_INITIAL_PAGE_SIZE = 150;
 
 /**
- * Default extra rows requested each time the load-more sentinel comes into
- * view - sized for the Roster, which can genuinely run to hundreds of
- * people. Smaller collections (calling/advancement workflows) define their
- * own, smaller increment locally instead of importing this, so a single
- * scroll doesn't just fetch the rest of an already-small collection in one
- * hop and make the paging invisible.
- */
-export const PAGE_INCREMENT = 25;
-
-/**
  * Estimates how many rows of height `rowHeightPx` fit in the current
  * viewport, so the first Firestore query for a list asks for about one
  * screenful instead of the whole collection. Doesn't need to be exact -
