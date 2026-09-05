@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { combineLatest, map, of, switchMap } from 'rxjs';
@@ -27,8 +27,13 @@ import {
   type PriesthoodAdvancementWorkflow,
 } from '../models/types';
 
+/** Distinguishes a calling extension from a release from a priesthood
+ * advancement - the axis the top-of-page toggle filters on. */
+type RowType = 'calling' | 'release' | 'advancement';
+
 interface PersonalRow {
   id: string;
+  type: RowType;
   title: string;
   subtitle: string;
   link: string[];
@@ -54,6 +59,12 @@ const INTERVIEW_ASSIGNED_STATUS = 'interview_assigned';
 /** The status a workflow starts at, before the presidency's own first review. */
 const PROPOSED_STATUS = 'proposed';
 
+const TYPE_LABELS: Record<RowType, string> = {
+  calling: 'Calling',
+  release: 'Release',
+  advancement: 'Advancement',
+};
+
 @Component({
   selector: 'app-assignments',
   standalone: true,
@@ -61,6 +72,33 @@ const PROPOSED_STATUS = 'proposed';
   template: `
     <div class="stack">
       <h1 style="margin-bottom: 0">Assignments</h1>
+
+      <div class="row" role="group" aria-label="Filter by type">
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="typeFilter() === 'all'"
+          (click)="typeFilter.set('all')"
+        >
+          All
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="typeFilter() === 'calling'"
+          (click)="typeFilter.set('calling')"
+        >
+          Callings
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="typeFilter() === 'release'"
+          (click)="typeFilter.set('release')"
+        >
+          Releases
+        </button>
+      </div>
 
       <div class="stack">
         <strong>Your assignments</strong>
@@ -71,8 +109,9 @@ const PROPOSED_STATUS = 'proposed';
             <div class="stack">
               <span class="text-sm muted">High Council votes</span>
               @for (row of myVotes(); track row.id) {
-                <a class="list-item" [routerLink]="row.link">
+                <a class="list-item type-{{ row.type }}" [routerLink]="row.link">
                   <strong>{{ row.title }}</strong>
+                  <span class="type-tag type-tag-{{ row.type }}">{{ typeLabel(row.type) }}</span>
                   <div class="muted text-sm">{{ row.subtitle }}</div>
                 </a>
               }
@@ -82,8 +121,9 @@ const PROPOSED_STATUS = 'proposed';
             <div class="stack">
               <span class="text-sm muted">Interviews to conduct</span>
               @for (row of myInterviews(); track row.id) {
-                <a class="list-item" [routerLink]="row.link">
+                <a class="list-item type-{{ row.type }}" [routerLink]="row.link">
                   <strong>{{ row.title }}</strong>
+                  <span class="type-tag type-tag-{{ row.type }}">{{ typeLabel(row.type) }}</span>
                   <div class="muted text-sm">{{ row.subtitle }}</div>
                 </a>
               }
@@ -102,9 +142,10 @@ const PROPOSED_STATUS = 'proposed';
               <p class="muted">Nothing is currently proposed.</p>
             } @else {
               @for (row of allProposed(); track row.id) {
-                <div class="card row-between">
+                <div class="card row-between type-{{ row.type }}">
                   <div>
                     <strong>{{ row.title }}</strong>
+                    <span class="type-tag type-tag-{{ row.type }}">{{ typeLabel(row.type) }}</span>
                     <p class="muted text-sm" style="margin: 0">{{ row.subtitle }}</p>
                   </div>
                   <div style="text-align: right">
@@ -122,10 +163,11 @@ const PROPOSED_STATUS = 'proposed';
               <p class="muted">Nothing is currently awaiting a High Council vote.</p>
             } @else {
               @for (row of outstandingVotes(); track row.id) {
-                <div class="card stack">
+                <div class="card stack type-{{ row.type }}">
                   <div class="row-between">
                     <div>
                       <strong>{{ row.title }}</strong>
+                      <span class="type-tag type-tag-{{ row.type }}">{{ typeLabel(row.type) }}</span>
                       <p class="muted text-sm" style="margin: 0">{{ row.subtitle }}</p>
                     </div>
                     <a class="btn btn-responsive" [routerLink]="row.link">View</a>
@@ -170,9 +212,10 @@ const PROPOSED_STATUS = 'proposed';
               <p class="muted">Nothing is currently awaiting an interview.</p>
             } @else {
               @for (row of allInterviews(); track row.id) {
-                <div class="card row-between">
+                <div class="card row-between type-{{ row.type }}">
                   <div>
                     <strong>{{ row.title }}</strong>
+                    <span class="type-tag type-tag-{{ row.type }}">{{ typeLabel(row.type) }}</span>
                     <p class="muted text-sm" style="margin: 0">{{ row.subtitle }}</p>
                   </div>
                   <div style="text-align: right">
@@ -198,12 +241,64 @@ const PROPOSED_STATUS = 'proposed';
       .roster-line {
         line-height: 1.45;
       }
+      .btn-sm {
+        min-height: var(--tap);
+        padding: 0.3rem 0.75rem;
+        font-size: 0.85rem;
+      }
+      /* Left-border accent so a whole row/card reads as "calling" or
+         "release" at a glance, without relying on the text tag alone. */
+      .type-calling {
+        border-left: 4px solid var(--primary);
+      }
+      .type-release {
+        border-left: 4px solid var(--release);
+      }
+      .type-advancement {
+        border-left: 4px solid var(--muted);
+      }
+      .type-tag {
+        display: inline-block;
+        margin-left: 0.4rem;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        vertical-align: middle;
+      }
+      .type-tag-calling {
+        background: color-mix(in srgb, var(--primary) 16%, white);
+        color: var(--primary);
+      }
+      .type-tag-release {
+        background: color-mix(in srgb, var(--release) 18%, white);
+        color: var(--release);
+      }
+      .type-tag-advancement {
+        background: color-mix(in srgb, var(--muted) 20%, white);
+        color: var(--muted);
+      }
     `,
   ],
 })
 export class AssignmentsComponent {
   protected readonly authService = inject(AuthService);
   protected readonly isPresidency = isPresidency;
+  protected readonly typeLabel = (type: RowType) => TYPE_LABELS[type];
+
+  /**
+   * "All" vs. "Callings" vs. "Releases" toggle at the top of the page.
+   * Advancements are neither, so selecting either non-"all" option hides
+   * them too - the toggle answers "which of these direction-of-change rows
+   * do I want," not "show me advancements as well."
+   */
+  protected readonly typeFilter = signal<'all' | 'calling' | 'release'>('all');
+
+  private matchesFilter(type: RowType): boolean {
+    const filter = this.typeFilter();
+    return filter === 'all' || filter === type;
+  }
 
   private readonly callingsService = inject(CallingsService);
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
@@ -230,6 +325,7 @@ export class AssignmentsComponent {
       .filter((w) => awaitsCallingResponseFrom(w, user))
       .map((w) => ({
         id: w.id,
+        type: w.workflowType,
         title: w.callingName,
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
@@ -238,11 +334,12 @@ export class AssignmentsComponent {
       .filter((w) => awaitsAdvancementResponseFrom(w, user))
       .map((w) => ({
         id: w.id,
+        type: 'advancement' as const,
         title: ADVANCEMENT_TYPE_LABELS[w.advancementType],
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/advancements', w.id],
       }));
-    return [...callingRows, ...advancementRows];
+    return [...callingRows, ...advancementRows].filter((r) => this.matchesFilter(r.type));
   });
 
   /**
@@ -264,10 +361,12 @@ export class AssignmentsComponent {
       )
       .map((w) => ({
         id: w.id,
+        type: w.workflowType,
         title: w.callingName,
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
-      }));
+      }))
+      .filter((r) => this.matchesFilter(r.type));
   });
 
   /**
@@ -282,6 +381,7 @@ export class AssignmentsComponent {
       .filter((w) => w.status === PROPOSED_STATUS)
       .map((w) => ({
         id: w.id,
+        type: w.workflowType,
         title: w.callingName,
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
@@ -291,12 +391,13 @@ export class AssignmentsComponent {
       .filter((w) => w.status === PROPOSED_STATUS)
       .map((w) => ({
         id: w.id,
+        type: 'advancement' as const,
         title: ADVANCEMENT_TYPE_LABELS[w.advancementType],
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/advancements', w.id],
         proposedDate: formatTimestamp(w.proposedDate),
       }));
-    return [...callingRows, ...advancementRows];
+    return [...callingRows, ...advancementRows].filter((r) => this.matchesFilter(r.type));
   });
 
   /**
@@ -327,6 +428,7 @@ export class AssignmentsComponent {
                   map(
                     (history): OutstandingVoteRow => ({
                       id: w.id,
+                      type: w.workflowType,
                       title: w.callingName,
                       subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
                       link: ['/callings', w.id],
@@ -354,6 +456,7 @@ export class AssignmentsComponent {
                   map(
                     (history): OutstandingVoteRow => ({
                       id: w.id,
+                      type: 'advancement' as const,
                       title: ADVANCEMENT_TYPE_LABELS[w.advancementType],
                       subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
                       link: ['/advancements', w.id],
@@ -370,10 +473,11 @@ export class AssignmentsComponent {
     { initialValue: [] as OutstandingVoteRow[] },
   );
 
-  protected readonly outstandingVotes = computed(() => [
-    ...this.outstandingCallings(),
-    ...this.outstandingAdvancements(),
-  ]);
+  protected readonly outstandingVotes = computed(() =>
+    [...this.outstandingCallings(), ...this.outstandingAdvancements()].filter((r) =>
+      this.matchesFilter(r.type),
+    ),
+  );
 
   /**
    * Every calling/release currently at `interview_assigned`, stake-wide,
@@ -386,10 +490,12 @@ export class AssignmentsComponent {
       .filter((w) => w.status === INTERVIEW_ASSIGNED_STATUS)
       .map((w) => ({
         id: w.id,
+        type: w.workflowType,
         title: w.callingName,
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
         assignedTo: w.assignedTo?.trim() || null,
-      })),
+      }))
+      .filter((r) => this.matchesFilter(r.type)),
   );
 }

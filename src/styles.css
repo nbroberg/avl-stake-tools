@@ -15,6 +15,9 @@
   --accent: #2f7d5e;
   --danger: #b3261e;
   --warn: #9a6b00;
+  /* Distinct from --warn (used for in-page "concern" text) so a release-type
+     tag never reads as a warning next to an actual concern on the same card. */
+  --release: #c2410c;
 
   /* Minimum comfortable touch target (iOS HIG / Material both land near 44px). */
   --tap: 44px;
