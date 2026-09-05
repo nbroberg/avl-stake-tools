@@ -13,6 +13,7 @@ import { AdvancementsListComponent } from './pages/advancements/advancements-lis
 import { NewAdvancementComponent } from './pages/advancements/new-advancement.component';
 import { AdvancementDetailComponent } from './pages/advancements/advancement-detail.component';
 import { UnitsComponent } from './pages/units.component';
+import { HelpComponent } from './pages/help.component';
 
 export const routes: Routes = [
   // Public routes - no sign-in required.
@@ -35,6 +36,7 @@ export const routes: Routes = [
       { path: 'advancements', component: AdvancementsListComponent },
       { path: 'advancements/new', component: NewAdvancementComponent },
       { path: 'advancements/:id', component: AdvancementDetailComponent },
+      { path: 'help', component: HelpComponent },
     ],
   },
 

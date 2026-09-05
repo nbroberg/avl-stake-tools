@@ -106,9 +106,9 @@ import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/
           <strong>Priesthood Advancements</strong>
           <div class="muted text-sm">Track Priest→Elder and Elder→High Priest approvals.</div>
         </a>
-        <a class="list-item" routerLink="/diagnostics">
-          <strong>Diagnostics</strong>
-          <div class="muted text-sm">Check Firebase Auth and Firestore connectivity.</div>
+        <a class="list-item" routerLink="/help">
+          <strong>Help</strong>
+          <div class="muted text-sm">How to use this app - roles, workflows, voting, and more.</div>
         </a>
       </div>
     </div>

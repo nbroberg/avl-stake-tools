@@ -44,7 +44,6 @@ const config = {
     appId: readEnv('FIREBASE_APP_ID'),
   },
   googleAuthHd: readEnv('GOOGLE_AUTH_HD', ''),
-  enableDiagnosticsLink: readEnv('ENABLE_DIAGNOSTICS_LINK', 'true') === 'true',
   // Demo mode (mock data, no Firebase) is always available in a dev build.
   // This flag is what lets a PRODUCTION build offer it, so it defaults to
   // false: a normal deploy can't be talked into showing fake data.

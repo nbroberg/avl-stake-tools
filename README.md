@@ -14,6 +14,12 @@ minimum roster and audit support that workflow needs — scheduling,
 appointments, and public booking pages have been deliberately removed
 from the initial architecture.
 
+**Using the app day to day?** This README is for setting up and
+developing the project. See [`docs/user-guide.md`](docs/user-guide.md)
+instead for how to sign in, propose and approve callings, vote as a
+high councilor, sustain and set apart, and everything else the app
+does for a stake presidency or council member.
+
 ## How authorization works (read this first)
 
 Firebase Authentication (Google sign-in) only proves **who** someone
@@ -406,11 +412,6 @@ project — see `.env.example`):
 - `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID`
 - `GOOGLE_AUTH_HD` (optional; leave unset if not restricting the
   Google consent screen to one Workspace/consumer domain)
-
-`ENABLE_DIAGNOSTICS_LINK` (optional) is read as a variable rather than a
-secret: **Settings → Secrets and variables → Actions → Variables**,
-set `ENABLE_DIAGNOSTICS_LINK=false` to hide the diagnostics link from
-the sign-in screen in production builds.
 
 **Base href.** The workflow sets `--base-href "/<repo>/"` automatically
 from `${{ github.event.repository.name }}`, matching the default

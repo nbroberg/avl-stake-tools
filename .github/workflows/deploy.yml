@@ -74,7 +74,6 @@ jobs:
           FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           GOOGLE_AUTH_HD: ${{ secrets.GOOGLE_AUTH_HD }}
-          ENABLE_DIAGNOSTICS_LINK: ${{ vars.ENABLE_DIAGNOSTICS_LINK || 'true' }}
         run: node scripts/generate-environment.mjs
 
       - name: Build

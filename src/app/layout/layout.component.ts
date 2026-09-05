@@ -39,7 +39,7 @@ const TEXT_INPUT_TYPES = new Set([
         <a routerLink="/assignments" routerLinkActive="active">Assignments</a>
         <a routerLink="/callings" routerLinkActive="active">Callings</a>
         <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
-        <a routerLink="/diagnostics" routerLinkActive="active">Diagnostics</a>
+        <a routerLink="/help" routerLinkActive="active">Help</a>
       </nav>
       <main class="app-main">
         <div class="page">
