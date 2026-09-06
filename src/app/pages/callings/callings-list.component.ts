@@ -64,6 +64,16 @@ function labelFor(w: CallingWorkflow): string {
         padding: 0.3rem 0.75rem;
         font-size: 0.85rem;
       }
+      /* Whole-card shading so a calling vs. a release reads at a glance,
+         not just from the small text label in the subtitle line. */
+      .list-item.type-calling {
+        background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+        border-left: 4px solid var(--primary);
+      }
+      .list-item.type-release {
+        background: color-mix(in srgb, var(--release) 8%, var(--surface));
+        border-left: 4px solid var(--release);
+      }
     `,
   ],
   template: `
@@ -113,7 +123,7 @@ function labelFor(w: CallingWorkflow): string {
 
         <div class="stack">
           @for (w of visible(); track w.id) {
-            <a class="list-item" [routerLink]="['/callings', w.id]">
+            <a class="list-item type-{{ w.workflowType }}" [routerLink]="['/callings', w.id]">
               <div class="row-between">
                 <div style="min-width: 0">
                   <strong>{{ w.callingName }}</strong>
