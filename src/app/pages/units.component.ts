@@ -18,6 +18,7 @@ import {
 import { stakeUnits } from '../core/units';
 import {
   ADVANCEMENT_TYPE_LABELS,
+  type AppUser,
   type CallingWorkflow,
   type Person,
   type PriesthoodAdvancementWorkflow,
@@ -121,6 +122,36 @@ import {
             }
             @if (pendingReleases().length === 0 && pendingSustaining().length === 0) {
               <p class="text-sm muted" style="margin: 0">Nothing to read for this unit.</p>
+            } @else if (readableCount() > 0) {
+              @if (confirmingMarkAllRead()) {
+                <!-- Deliberate two-step: this advances every item above to
+                     sustained in one shot, hard to unwind individually. -->
+                <div class="confirm stack">
+                  <span class="text-sm">
+                    Mark all {{ readableCount() }} item{{ readableCount() === 1 ? '' : 's' }} above
+                    as read and record the vote for each?
+                  </span>
+                  <div class="row">
+                    <button class="btn btn-primary" [disabled]="busy()" (click)="markAllRead()">
+                      Yes, mark all as read
+                    </button>
+                    <button class="btn" [disabled]="busy()" (click)="confirmingMarkAllRead.set(false)">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="busy()"
+                  (click)="confirmingMarkAllRead.set(true)"
+                >
+                  Mark all as read
+                </button>
+              }
+            } @else {
+              <span class="text-sm muted">Only the presidency or high council can record this.</span>
             }
           </div>
         } @else {
@@ -269,6 +300,14 @@ import {
       }
       .unit-outlook-row:first-of-type { border-top: none; padding-top: 0; }
       .unit-outlook-row:hover, .unit-outlook-row:focus-visible { background: var(--bg); }
+
+      .confirm {
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid var(--primary);
+        background: var(--bg);
+        gap: 0.6rem;
+      }
     `,
   ],
 })
@@ -290,6 +329,7 @@ export class UnitsComponent {
    *  worklist (act on each item) and the plain wording a clerk reads
    *  verbatim for stake business in the meeting. */
   protected readonly scriptView = signal(false);
+  protected readonly confirmingMarkAllRead = signal(false);
 
   private readonly workflows = toSignal(this.callingsService.listWorkflows(), {
     initialValue: [] as CallingWorkflow[],
@@ -346,6 +386,14 @@ export class UnitsComponent {
     return this.eligibleForSustaining(unit).filter((row) => row.workflow.workflowType === 'release');
   });
 
+  /** How many items on the script the signed-in user is actually allowed
+   *  to record - drives whether "Mark all as read" appears at all. */
+  protected readonly readableCount = computed(
+    () =>
+      [...this.pendingReleases(), ...this.pendingSustaining()].filter((row) => row.canAct)
+        .length,
+  );
+
   protected readonly pendingSetApart = computed(() => {
     const unit = this.selectedUnit();
     if (!unit) return [];
@@ -389,13 +437,44 @@ export class UnitsComponent {
     if (!actor) return;
     this.busy.set(true);
     try {
-      if (w.unit) {
-        await this.callingsService.advanceStatus(w, 'sustained', actor);
-      } else {
-        await this.callingsService.markUnitSustained(w, this.selectedUnit(), actor);
+      await this.advanceToSustained(w, actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** The action behind both a single row's "Sustain only"/"Record vote of
+   *  thanks" button and the script view's bulk "Mark all as read" - a
+   *  stake-wide workflow (no `unit`) needs this unit added to its own
+   *  per-unit tally instead of a flat status advance. */
+  private async advanceToSustained(w: CallingWorkflow, actor: AppUser): Promise<void> {
+    if (w.unit) {
+      await this.callingsService.advanceStatus(w, 'sustained', actor);
+    } else {
+      await this.callingsService.markUnitSustained(w, this.selectedUnit(), actor);
+    }
+  }
+
+  /** Records the vote for every readable item on the script in one shot -
+   *  the in-meeting shortcut for "we just read all of this out loud."
+   *  Skips any row the signed-in user isn't allowed to record (rare: a
+   *  mixed-permission list isn't expected in practice, but this stays
+   *  safe if it ever happens) rather than failing the whole batch. */
+  async markAllRead(): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    const rows = [...this.pendingReleases(), ...this.pendingSustaining()].filter(
+      (row) => row.canAct,
+    );
+    if (rows.length === 0) return;
+    this.busy.set(true);
+    try {
+      for (const row of rows) {
+        await this.advanceToSustained(row.workflow, actor);
       }
     } finally {
       this.busy.set(false);
+      this.confirmingMarkAllRead.set(false);
     }
   }
 
