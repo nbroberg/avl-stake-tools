@@ -52,7 +52,10 @@ import {
 
       <div class="card stack">
         @if (selectedUnit()) {
-          <div style="text-align: right">
+          <div class="row" style="justify-content: flex-end">
+            <button type="button" class="btn text-sm" (click)="scriptView.set(!scriptView())">
+              {{ scriptView() ? 'Show list view' : 'Show reading script' }}
+            </button>
             <button type="button" class="btn text-sm" (click)="selectedUnit.set('')">
               Show all units
             </button>
@@ -84,70 +87,108 @@ import {
       </div>
 
       @if (selectedUnit()) {
-        <div class="card stack">
-          <strong>Releases</strong>
-          @if (pendingReleases().length === 0) {
-            <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
-          }
-          @for (row of pendingReleases(); track row.workflow.id) {
-            <div class="row-between sunday-row">
-              <div>
-                <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
-                <span class="muted"> — {{ row.workflow.callingName }}</span>
-                @if (!row.workflow.unit) {
-                  <p class="text-sm muted" style="margin: 0.15rem 0 0">
-                    Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
-                  </p>
-                }
+        @if (scriptView()) {
+          <div class="card stack">
+            @if (pendingReleases().length > 0) {
+              <div class="stack">
+                <strong>Releases</strong>
+                <p style="margin: 0">
+                  The following individuals have been released from their respective callings.
+                  Those who wish to express appreciation for their service may do so by the
+                  uplifted hand.
+                </p>
+                <ul style="margin: 0; padding-left: 1.25rem">
+                  @for (row of pendingReleases(); track row.workflow.id) {
+                    <li>{{ row.workflow.personName }} — {{ row.workflow.callingName }}</li>
+                  }
+                </ul>
               </div>
-              @if (row.canAct) {
-                <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
-                  Record vote of thanks
-                </button>
-              } @else {
-                <span class="text-sm muted">Only the presidency or high council can record this.</span>
-              }
-            </div>
-          }
-        </div>
-
-        <div class="card stack">
-          <strong>Needs sustaining</strong>
-          @if (pendingSustaining().length === 0) {
-            <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
-          }
-          @for (row of pendingSustaining(); track row.workflow.id) {
-            <div class="row-between sunday-row">
-              <div>
-                <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
-                <span class="muted"> — {{ row.workflow.callingName }}</span>
-                @if (!row.workflow.unit) {
-                  <p class="text-sm muted" style="margin: 0.15rem 0 0">
-                    Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
-                  </p>
-                }
+            }
+            @if (pendingSustaining().length > 0) {
+              <div class="stack">
+                <strong>Sustainings</strong>
+                <p style="margin: 0">
+                  The following individuals have been called to serve in their respective
+                  callings. Those in favor may manifest it by the uplifted hand. Those opposed,
+                  if any, may manifest it.
+                </p>
+                <ul style="margin: 0; padding-left: 1.25rem">
+                  @for (row of pendingSustaining(); track row.workflow.id) {
+                    <li>{{ row.workflow.personName }} — {{ row.workflow.callingName }}</li>
+                  }
+                </ul>
               </div>
-              @if (row.canAct) {
-                <div class="row">
-                  @if (row.canCombine) {
-                    <button class="btn btn-primary" [disabled]="busy()" (click)="sustainAndSetApart(row.workflow)">
-                      Sustain &amp; set apart
-                    </button>
-                    <button class="btn" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
-                      Sustain only
-                    </button>
-                  } @else {
-                    <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
-                      Mark sustained here
-                    </button>
+            }
+            @if (pendingReleases().length === 0 && pendingSustaining().length === 0) {
+              <p class="text-sm muted" style="margin: 0">Nothing to read for this unit.</p>
+            }
+          </div>
+        } @else {
+          <div class="card stack">
+            <strong>Releases</strong>
+            @if (pendingReleases().length === 0) {
+              <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
+            }
+            @for (row of pendingReleases(); track row.workflow.id) {
+              <div class="row-between sunday-row">
+                <div>
+                  <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
+                  <span class="muted"> — {{ row.workflow.callingName }}</span>
+                  @if (!row.workflow.unit) {
+                    <p class="text-sm muted" style="margin: 0.15rem 0 0">
+                      Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
+                    </p>
                   }
                 </div>
-              } @else {
-                <span class="text-sm muted">Only the presidency or high council can record this.</span>
-              }
-            </div>
-          }
-        </div>
+                @if (row.canAct) {
+                  <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
+                    Record vote of thanks
+                  </button>
+                } @else {
+                  <span class="text-sm muted">Only the presidency or high council can record this.</span>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="card stack">
+            <strong>Needs sustaining</strong>
+            @if (pendingSustaining().length === 0) {
+              <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
+            }
+            @for (row of pendingSustaining(); track row.workflow.id) {
+              <div class="row-between sunday-row">
+                <div>
+                  <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
+                  <span class="muted"> — {{ row.workflow.callingName }}</span>
+                  @if (!row.workflow.unit) {
+                    <p class="text-sm muted" style="margin: 0.15rem 0 0">
+                      Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
+                    </p>
+                  }
+                </div>
+                @if (row.canAct) {
+                  <div class="row">
+                    @if (row.canCombine) {
+                      <button class="btn btn-primary" [disabled]="busy()" (click)="sustainAndSetApart(row.workflow)">
+                        Sustain &amp; set apart
+                      </button>
+                      <button class="btn" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
+                        Sustain only
+                      </button>
+                    } @else {
+                      <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
+                        Mark sustained here
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <span class="text-sm muted">Only the presidency or high council can record this.</span>
+                }
+              </div>
+            }
+          </div>
+        }
 
         <div class="card stack">
           <strong>Needs setting apart</strong>
@@ -245,6 +286,10 @@ export class UnitsComponent {
   // (?unit=<number>) so a tap there lands here already filtered.
   protected readonly selectedUnit = signal(this.route.snapshot.queryParamMap.get('unit') ?? '');
   protected readonly busy = signal(false);
+  /** Toggles the Releases/Needs sustaining cards between the interactive
+   *  worklist (act on each item) and the plain wording a clerk reads
+   *  verbatim for stake business in the meeting. */
+  protected readonly scriptView = signal(false);
 
   private readonly workflows = toSignal(this.callingsService.listWorkflows(), {
     initialValue: [] as CallingWorkflow[],
