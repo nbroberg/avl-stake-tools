@@ -66,11 +66,11 @@ import {
           >
             <strong>{{ row.unit.name }}</strong>
             <span class="row text-sm muted" style="gap: 1rem">
-              @if (row.sustainings > 0) {
-                <span>{{ row.sustainings }} sustaining{{ row.sustainings === 1 ? '' : 's' }}</span>
-              }
               @if (row.releases > 0) {
                 <span>{{ row.releases }} release{{ row.releases === 1 ? '' : 's' }}</span>
+              }
+              @if (row.sustainings > 0) {
+                <span>{{ row.sustainings }} sustaining{{ row.sustainings === 1 ? '' : 's' }}</span>
               }
               @if (row.setApart > 0) {
                 <span>{{ row.setApart }} set apart</span>
@@ -84,6 +84,33 @@ import {
       </div>
 
       @if (selectedUnit()) {
+        <div class="card stack">
+          <strong>Releases</strong>
+          @if (pendingReleases().length === 0) {
+            <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
+          }
+          @for (row of pendingReleases(); track row.workflow.id) {
+            <div class="row-between sunday-row">
+              <div>
+                <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
+                <span class="muted"> — {{ row.workflow.callingName }}</span>
+                @if (!row.workflow.unit) {
+                  <p class="text-sm muted" style="margin: 0.15rem 0 0">
+                    Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
+                  </p>
+                }
+              </div>
+              @if (row.canAct) {
+                <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
+                  Record vote of thanks
+                </button>
+              } @else {
+                <span class="text-sm muted">Only the presidency or high council can record this.</span>
+              }
+            </div>
+          }
+        </div>
+
         <div class="card stack">
           <strong>Needs sustaining</strong>
           @if (pendingSustaining().length === 0) {
@@ -115,33 +142,6 @@ import {
                     </button>
                   }
                 </div>
-              } @else {
-                <span class="text-sm muted">Only the presidency or high council can record this.</span>
-              }
-            </div>
-          }
-        </div>
-
-        <div class="card stack">
-          <strong>Releases</strong>
-          @if (pendingReleases().length === 0) {
-            <p class="text-sm muted" style="margin: 0">Nothing outstanding here.</p>
-          }
-          @for (row of pendingReleases(); track row.workflow.id) {
-            <div class="row-between sunday-row">
-              <div>
-                <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
-                <span class="muted"> — {{ row.workflow.callingName }}</span>
-                @if (!row.workflow.unit) {
-                  <p class="text-sm muted" style="margin: 0.15rem 0 0">
-                    Stake-wide &middot; {{ row.sustainedCount }} of {{ stakeUnitsList.length }} units done
-                  </p>
-                }
-              </div>
-              @if (row.canAct) {
-                <button class="btn btn-primary" [disabled]="busy()" (click)="sustainOnly(row.workflow)">
-                  Record vote of thanks
-                </button>
               } @else {
                 <span class="text-sm muted">Only the presidency or high council can record this.</span>
               }
