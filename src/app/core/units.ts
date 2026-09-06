@@ -1,16 +1,18 @@
 /**
  * Units in this stake, keyed by their Church-issued unit number. The
- * unit number is the stable identity - names get changed when units
- * are reorganized, renumbered, or renamed for language groups (e.g.
- * the Pohnpeian branch's parenthetical), but the number persists.
+ * unit number is the stable identity - display names can be simplified
+ * or units can be reorganized/renumbered, but the number persists. See
+ * `lcrName` on StakeUnit for the case where LCR's own unit text (what the
+ * importer matches against) needs to keep a suffix - e.g. a language-group
+ * designation like "(Pohnpeian)" - that the UI's display `name` drops.
  *
  * Analogous to using MRN as the person doc id: the number is opaque,
  * doesn't leak sensitive data, and gives clean joins across
  * collections without name-drift bugs.
  *
- * This list is the authoritative set. The LCR importer will refuse
- * rows whose unit name doesn't match one of these; the New Calling
- * form's Unit dropdown reads directly from it.
+ * This list is the authoritative set. The LCR importer will refuse rows
+ * whose unit text doesn't match one of these (by `lcrName` or `name`); the
+ * New Calling form's Unit dropdown shows the display `name`.
  */
 export type UnitKind = 'ward' | 'branch';
 
@@ -18,8 +20,16 @@ export interface StakeUnit {
   /** Church-issued unit number, stored as a string because it is an id
    *  (not an integer to do arithmetic on). */
   number: string;
-  /** Human-readable name as it appears in LCR reports. */
+  /** Display name used throughout the app's UI. */
   name: string;
+  /**
+   * LCR's own unit text, when it differs from the display `name` (e.g. a
+   * language-group suffix like "(Pohnpeian)" that the UI intentionally
+   * drops but LCR's own "Unit" column still reports). The importer's
+   * unitByName() matches against this, falling back to `name` when unset,
+   * so a display-only rename never breaks import matching.
+   */
+  lcrName?: string;
   kind: UnitKind;
 }
 
@@ -39,12 +49,17 @@ const REAL_STAKE_UNITS: readonly StakeUnit[] = [
   { number: '193534',  name: 'Asheville Central Branch',                kind: 'branch' },
   { number: '188840',  name: 'Brevard Branch',                          kind: 'branch' },
   { number: '95486',   name: 'Franklin Branch',                         kind: 'branch' },
-  { number: '1906070', name: 'Hendersonville 2nd Branch (Pohnpeian)',   kind: 'branch' },
+  {
+    number: '1906070',
+    name: 'Hendersonville 2nd Branch',
+    lcrName: 'Hendersonville 2nd Branch (Pohnpeian)',
+    kind: 'branch',
+  },
 ];
 
 let activeUnits: readonly StakeUnit[] = REAL_STAKE_UNITS;
 let byNumber = new Map(activeUnits.map((u) => [u.number, u]));
-let byNameLower = new Map(activeUnits.map((u) => [u.name.toLowerCase(), u]));
+let byNameLower = new Map(activeUnits.map((u) => [(u.lcrName ?? u.name).toLowerCase(), u]));
 
 /** The active unit vocabulary - the real stake's, or demo mode's. */
 export function stakeUnits(): readonly StakeUnit[] {
@@ -64,7 +79,7 @@ export function stakeUnits(): readonly StakeUnit[] {
 export function overrideStakeUnits(units: readonly StakeUnit[]): void {
   activeUnits = units;
   byNumber = new Map(units.map((u) => [u.number, u]));
-  byNameLower = new Map(units.map((u) => [u.name.toLowerCase(), u]));
+  byNameLower = new Map(units.map((u) => [(u.lcrName ?? u.name).toLowerCase(), u]));
 }
 
 /** Lookup by number. Returns undefined for an unknown id. */

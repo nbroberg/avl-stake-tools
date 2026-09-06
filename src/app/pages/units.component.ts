@@ -51,14 +51,13 @@ import {
       </div>
 
       <div class="card stack">
-        <div class="row-between">
-          <strong>Outlook</strong>
-          @if (selectedUnit()) {
+        @if (selectedUnit()) {
+          <div style="text-align: right">
             <button type="button" class="btn text-sm" (click)="selectedUnit.set('')">
               Show all units
             </button>
-          }
-        </div>
+          </div>
+        }
         @for (row of unitsOutlook(); track row.unit.number) {
           <button
             type="button"
