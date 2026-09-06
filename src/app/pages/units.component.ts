@@ -325,10 +325,11 @@ export class UnitsComponent {
   // (?unit=<number>) so a tap there lands here already filtered.
   protected readonly selectedUnit = signal(this.route.snapshot.queryParamMap.get('unit') ?? '');
   protected readonly busy = signal(false);
-  /** Toggles the Releases/Needs sustaining cards between the interactive
-   *  worklist (act on each item) and the plain wording a clerk reads
-   *  verbatim for stake business in the meeting. */
-  protected readonly scriptView = signal(false);
+  /** Toggles the Releases/Needs sustaining cards between the plain wording
+   *  a clerk reads verbatim for stake business in the meeting (the default,
+   *  since picking a unit almost always means "I'm about to read this") and
+   *  the interactive worklist for acting on one item at a time. */
+  protected readonly scriptView = signal(true);
   protected readonly confirmingMarkAllRead = signal(false);
 
   private readonly workflows = toSignal(this.callingsService.listWorkflows(), {
