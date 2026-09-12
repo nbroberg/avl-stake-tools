@@ -1,4 +1,4 @@
-import type { AppUser, Role } from '../models/types';
+import type { AppUser, CallingWorkflow, Role } from '../models/types';
 
 /**
  * UX-only role helpers. Firestore Security Rules (see firestore.rules) are
@@ -71,3 +71,31 @@ export function canAdvanceStatus(
   }
   return false;
 }
+
+/** Only the presidency can bulk-mark every outstanding unit sustained. */
+export function canMarkAllUnitsSustained(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
+
+/**
+ * Whether the caller may log (or undo) that a calling was set apart.
+ * Presidency always; a High Councilor only once Finalizing has begun -
+ * `status` is `sustained` (sustaining under way, possibly not full yet)
+ * or `recorded_in_lcr` (already recorded, awaiting this) - matching the
+ * same window core/sunday-visit.ts's needsSetApart offers it in.
+ */
+export function canLogSetApart(user: AppUser | null, workflow: Pick<CallingWorkflow, 'status'>): boolean {
+  if (isPresidency(user)) return true;
+  return isHighCouncil(user) && (workflow.status === 'sustained' || workflow.status === 'recorded_in_lcr');
+}
+
+/** Alias for canLogSetApart - undoing a set-apart log uses the same eligibility. */
+export const canUndoSetApart = canLogSetApart;
+
+/** Only the presidency can mark (or undo marking) a calling recorded in LCR. */
+export function canRecordInLcr(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
+
+/** Alias for canRecordInLcr - undoing a recorded mark uses the same eligibility. */
+export const canUndoRecordInLcr = canRecordInLcr;

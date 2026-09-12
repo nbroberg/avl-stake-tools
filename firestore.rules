@@ -25,6 +25,20 @@ rules_version = '2';
 //   writes - see isHighCouncilMarkSustainedUnit, isHighCouncilSustain,
 //   isHighCouncilSetApart, and isHighCouncilOrdain below.
 //
+//   A calling/release enters Finalizing the moment ONE unit sustains it
+//   (`status` moves to `sustained` there, not once every unit has - see
+//   core/callings.service.ts's recomputeStatus/nextStatus), and stays at
+//   `sustained` for as long as it takes every required unit to report -
+//   so the three functions below accept `sustained` as a starting status
+//   too, not just `accepted`/`released`, and accept the small set of
+//   tail literals (`sustained`, `set_apart`, `recorded_in_lcr`,
+//   `complete`) as the result, without independently re-deriving exactly
+//   which one is correct for the given date fields the way the app's own
+//   nextStatus does - marking a sustaining event (or setting apart) is
+//   already something the caller is authorized to do, so at most it
+//   lands a workflow it can already touch on a slightly-off tail literal,
+//   not a PII exposure, which is this file's actual concern.
+//
 // Users cannot elevate themselves - the users collection is not writable
 // from the app; the first admin adds subsequent user docs via the
 // Firebase Console.
@@ -213,10 +227,17 @@ service cloud.firestore {
      */
     function isHighCouncilMarkSustainedUnit() {
       return isHighCouncil()
-        && (resource.data.status == 'accepted' || resource.data.status == 'released')
-        && request.resource.data.status == resource.data.status
+        && (resource.data.status == 'accepted' || resource.data.status == 'released'
+            || resource.data.status == 'sustained')
+        && (request.resource.data.status == 'sustained'
+            || request.resource.data.status == 'set_apart'
+            || request.resource.data.status == 'recorded_in_lcr'
+            || request.resource.data.status == 'complete')
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['sustainedInUnits', 'updatedAt', 'updatedBy']);
+             .hasOnly([
+               'status', 'sustainedInUnits', 'sustainedByPresidencyUnits',
+               'sustainedDate', 'completedDate', 'updatedAt', 'updatedBy',
+             ]);
     }
 
     /**
@@ -224,37 +245,45 @@ service cloud.firestore {
      * either the ordinary "sustained here" case, or the same visit also
      * setting the person apart because the councilor is physically
      * present with them (core/sunday-visit.ts decides which on the
-     * client; here we just accept either resulting status). Covers both
-     * the calling ladder (accepted -> ...) and the release ladder
-     * (released -> ...). setApartBy, when present, must be the caller's
-     * own recorded name - they can't attribute the act to anyone else.
+     * client; here we just accept any resulting status Finalizing can
+     * produce). Covers both the calling ladder (accepted -> ...) and the
+     * release ladder (released -> ...), and a workflow already sitting at
+     * `sustained` from an earlier unit's visit. setApartBy, always
+     * present on this combined write, must be the caller's own recorded
+     * name - they can't attribute the act to anyone else.
      */
     function isHighCouncilSustain() {
       return isHighCouncil()
-        && (resource.data.status == 'accepted' || resource.data.status == 'released')
+        && (resource.data.status == 'accepted' || resource.data.status == 'released'
+            || resource.data.status == 'sustained')
         && (request.resource.data.status == 'sustained'
-            || request.resource.data.status == 'set_apart')
-        && (request.resource.data.status != 'set_apart'
-            || request.resource.data.get('setApartBy', '') == callerDoc().data.displayName)
+            || request.resource.data.status == 'set_apart'
+            || request.resource.data.status == 'recorded_in_lcr'
+            || request.resource.data.status == 'complete')
+        && request.resource.data.get('setApartBy', '') == callerDoc().data.displayName
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly([
                'status', 'sustainedDate', 'setApartDate', 'setApartBy',
-               'sustainedInUnits', 'updatedAt', 'updatedBy',
+               'sustainedInUnits', 'completedDate', 'updatedAt', 'updatedBy',
              ]);
     }
 
     /**
-     * A high councilor setting a person apart on a later visit, after the
-     * calling was already sustained (possibly by someone else, on an
-     * earlier visit). Same own-name restriction as isHighCouncilSustain.
+     * A high councilor logging that a person was set apart - either on a
+     * later visit after the calling was already sustained (possibly by
+     * someone else), or after the Stake Presidency already recorded it in
+     * LCR (setting apart and recording can happen in either order once
+     * Finalizing has begun). Same own-name restriction as
+     * isHighCouncilSustain.
      */
     function isHighCouncilSetApart() {
       return isHighCouncil()
-        && resource.data.status == 'sustained'
-        && request.resource.data.status == 'set_apart'
+        && (resource.data.status == 'sustained' || resource.data.status == 'recorded_in_lcr')
+        && (request.resource.data.status == 'set_apart'
+            || request.resource.data.status == 'complete')
         && request.resource.data.get('setApartBy', '') == callerDoc().data.displayName
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'setApartDate', 'setApartBy', 'updatedAt', 'updatedBy']);
+             .hasOnly(['status', 'setApartDate', 'setApartBy', 'completedDate', 'updatedAt', 'updatedBy']);
     }
 
     // ---------------------------------------------------------------------

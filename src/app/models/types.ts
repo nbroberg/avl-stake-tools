@@ -205,13 +205,30 @@ export interface CallingWorkflow {
    * Church-issued unit numbers where a stake-level calling (or release)
    * has already been sustained. Only meaningful when `unit` is omitted -
    * a stake calling has no stake conference to sustain it at, so it's
-   * sustained ward-by-ward as the presidency visits each unit, and the
-   * workflow can't advance to `sustained` until this covers every unit
-   * in stakeUnits() (see core/units.ts). Ward/branch-level callings need
-   * only their own unit's sustaining vote, which the plain status
-   * transition already captures - this field stays unused for those.
+   * sustained ward-by-ward as the presidency visits each unit. The
+   * workflow's `status` moves to `sustained` as soon as this covers ONE
+   * unit (entering Finalizing - see core/calling-status.ts's
+   * DATE_FIELD_BY_STATUS and callings.service.ts's recomputeStatus), and
+   * is considered fully sustained once it covers every unit in
+   * stakeUnits() (see core/units.ts and core/sunday-visit.ts's
+   * requiredUnitsFor). Ward/branch-level callings need only their own
+   * unit's sustaining vote, which the plain status transition already
+   * captures - this field stays unused for those.
    */
   sustainedInUnits?: string[];
+  /**
+   * Subset of `sustainedInUnits` added via the Stake Presidency's "Mark
+   * all units sustained" bulk action (see
+   * CallingsService.markAllUnitsSustained) rather than self-reported by
+   * a unit through the ordinary checklist. Lets the UI show "Marked by
+   * Stake Presidency" next to those units and lets
+   * undoMarkAllUnitsSustained() undo exactly the units that action
+   * added, without touching a unit that separately self-reported. A
+   * unit is removed from this array (but stays in `sustainedInUnits`)
+   * the moment it's genuinely self-reported afterward - see
+   * markUnitSustained().
+   */
+  sustainedByPresidencyUnits?: string[];
   proposedDate?: Timestamp;
   presidencyApprovedDate?: Timestamp;
   highCouncilApprovedDate?: Timestamp;

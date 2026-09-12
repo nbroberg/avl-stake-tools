@@ -22,7 +22,8 @@ import { db } from './firebase';
 import { DATE_FIELD_BY_STATUS, getPreviousStatus } from './calling-status';
 import { HC_QUORUM_REQUIRED } from './quorum';
 import { RosterSyncService } from './roster-sync.service';
-import { completesSustaining } from './sunday-visit';
+import { isFullySustained, requiredUnitsFor } from './sunday-visit';
+import { unitLabel } from './units';
 import type {
   AppUser,
   CallingStatus,
@@ -62,6 +63,13 @@ export interface AdvanceStatusOptions {
   setApartBy?: string;
   /** Optional per-transition note appended to the audit history. */
   note?: string;
+}
+
+/** The three independent Finalizing facts recomputeStatus derives `status` from. */
+interface FinalizingFacts {
+  fullySustained: boolean;
+  recorded: boolean;
+  setApart: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -139,8 +147,48 @@ export class CallingsService {
     return docRef.id;
   }
 
+  /**
+   * `status` beyond `sustained` is a *derivation* of three independent
+   * facts (fully sustained, recorded in LCR, set apart), not something
+   * any caller decides directly - see markUnitSustained,
+   * markAllUnitsSustained, logSetApart and recordInLcr below, all of
+   * which end by calling this. `complete` requires all three (a release
+   * has no set-apart leg, so it only needs the other two); short of
+   * that, `status` rests at whichever of `recorded_in_lcr`/`set_apart`
+   * reflects what's true - or `sustained` if nothing beyond sustaining
+   * has happened yet, or sustaining itself isn't yet full. This keeps
+   * every existing status literal in the same order they already have
+   * (proposed..accepted/released, sustained, set_apart, recorded_in_lcr,
+   * complete) - nothing new is introduced - it's just no longer *this
+   * method's caller's job* to decide which of the last few to land on.
+   */
+  private nextStatus(
+    workflowType: CallingWorkflowType,
+    facts: FinalizingFacts,
+  ): CallingStatus | ReleaseStatus {
+    if (!facts.fullySustained) return 'sustained';
+    const closed = facts.recorded && (workflowType === 'release' || facts.setApart);
+    if (closed) return 'complete';
+    if (facts.recorded) return 'recorded_in_lcr';
+    if (facts.setApart) return 'set_apart';
+    return 'sustained';
+  }
+
+  /**
+   * Whether Finalizing has begun - guards logSetApart/undoSetApart and
+   * recordInLcr/undoRecordInLcr, which only make sense once at least one
+   * unit has sustained the workflow (spec: setting apart "can be logged
+   * any time once the calling is in Finalizing"; the LCR Recording page
+   * only lists callings at least one unit has sustained). Calling one of
+   * those before then would otherwise compute `nextStatus` against an
+   * empty sustaining checklist and wrongly land on `sustained`.
+   */
+  private hasEnteredFinalizing(status: string): boolean {
+    return status === 'sustained' || status === 'set_apart' || status === 'recorded_in_lcr';
+  }
+
   async advanceStatus(
-    workflow: Pick<CallingWorkflow, 'id' | 'workflowType'>,
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit'>,
     newStatus: string,
     actor: AppUser,
     options: AdvanceStatusOptions = {},
@@ -149,19 +197,20 @@ export class CallingsService {
     const dateField = DATE_FIELD_BY_STATUS[newStatus];
     const assignedTo = newStatus === 'interview_assigned' ? options.assignedTo?.trim() : undefined;
     const setApartBy = newStatus === 'set_apart' ? options.setApartBy?.trim() : undefined;
-    // Recording in LCR is the last real-world step - nothing follows it -
-    // so it finalizes the workflow straight to `complete` rather than
-    // waiting on a separate "mark complete" click.
-    const finalizes = newStatus === 'recorded_in_lcr';
-    const status = finalizes ? 'complete' : newStatus;
+    // A ward/branch calling has no sustaining checklist of its own -
+    // reaching `sustained` here IS its one required unit's sustaining
+    // vote, so keep `sustainedInUnits` consistent with that. Every other
+    // Finalizing helper (isFullySustained, markUnitSustained, etc.) reads
+    // that field for every workflow now, not just stake-wide ones.
+    const sustainsOwnUnit = newStatus === 'sustained' && !!workflow.unit;
 
     await runTransaction(db, async (tx) => {
       tx.update(ref, {
-        status,
+        status: newStatus,
         updatedBy: actor.firebaseUid,
         updatedAt: serverTimestamp(),
         ...(dateField ? { [dateField]: serverTimestamp() } : {}),
-        ...(finalizes ? { completedDate: serverTimestamp() } : {}),
+        ...(sustainsOwnUnit ? { sustainedInUnits: arrayUnion(workflow.unit as string) } : {}),
         ...(assignedTo ? { assignedTo } : {}),
         ...(setApartBy ? { setApartBy } : {}),
       });
@@ -170,36 +219,41 @@ export class CallingsService {
     const noteParts: string[] = [];
     if (assignedTo) noteParts.push(`Assigned to ${assignedTo}.`);
     if (setApartBy) noteParts.push(`Set apart by ${setApartBy}.`);
-    if (finalizes) noteParts.push('Recorded in LCR; this finalizes the workflow.');
     if (options.note?.trim()) noteParts.push(options.note.trim());
     const note = noteParts.join(' ');
 
     await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
-      status,
+      status: newStatus,
       changedBy: actor.firebaseUid,
       changedByName: actor.displayName,
       changedAt: serverTimestamp(),
       ...(note ? { note } : {}),
     } satisfies WithFieldValue<Omit<CallingStatusHistoryEntry, 'id'>>);
-
-    if (finalizes) await this.rosterSync.flagRequired(actor);
   }
 
   /**
    * Undo the most recent status advance - for a mis-click or a step taken
-   * out of order. Clears the date field the last advance stamped, plus any
-   * actor field tied 1:1 to arriving at that status (assignedTo,
-   * setApartBy), so the detail page doesn't keep showing stale "assigned
-   * to"/"set apart by" info for a step that's been walked back. HC vote
-   * arrays and the sustaining checklist are left alone - they're a record
-   * of real events that already happened, not artifacts of the status
-   * field itself.
+   * out of order. Only meaningful on the strictly linear pre-Finalizing
+   * chain (`proposed` through `accepted`/`released`); once a workflow has
+   * any unit sustained, undoing is the three dedicated actions below
+   * (unmarkUnitSustained/undoMarkAllUnitsSustained, undoSetApart,
+   * undoRecordInLcr) instead, since those track independent facts a
+   * single "roll back one status" step can't safely unwind.
    */
   async rollbackStatus(
     workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'callingName' | 'status'>,
     actor: AppUser,
     note?: string,
   ): Promise<void> {
+    if (
+      workflow.status === 'sustained' ||
+      workflow.status === 'set_apart' ||
+      workflow.status === 'recorded_in_lcr' ||
+      workflow.status === 'complete'
+    ) {
+      return;
+    }
+
     const previousStatus = getPreviousStatus(
       workflow.workflowType,
       workflow.status,
@@ -215,11 +269,6 @@ export class CallingsService {
       updatedAt: serverTimestamp(),
       ...(dateField ? { [dateField]: deleteField() } : {}),
       ...(workflow.status === 'interview_assigned' ? { assignedTo: deleteField() } : {}),
-      ...(workflow.status === 'set_apart' ? { setApartBy: deleteField() } : {}),
-      // `complete` collapses the never-persisted `recorded_in_lcr` step -
-      // the finalizing write in advanceStatus() stamps both recordedDate
-      // and completedDate at once, so undoing it has to clear both.
-      ...(workflow.status === 'complete' ? { recordedDate: deleteField() } : {}),
     });
 
     await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
@@ -253,77 +302,403 @@ export class CallingsService {
   }
 
   /**
-   * Record that a stake-level workflow has been sustained in one more
-   * unit. Only meaningful while the workflow has no `unit` of its own
-   * (see CallingWorkflow.sustainedInUnits) - the UI only offers this for
-   * stake-wide callings/releases, but nothing here re-checks that, since
-   * marking a unit on a ward-level workflow is harmless, just unused.
-   *
-   * When this unit is the last one needed (core/sunday-visit.ts's
-   * completesSustaining), the status advances to `sustained` in the same
-   * write - the caller doesn't need a separate "now click advance"
-   * step once the checklist fills up.
+   * Record that a workflow has been sustained in one more unit - a ward/
+   * branch workflow has exactly one required unit (see
+   * core/sunday-visit.ts's requiredUnitsFor), a stake-wide one needs
+   * every unit in the stake. The first unit recorded from `accepted`/
+   * `released` moves `status` to `sustained` - that's entering
+   * Finalizing. Reaching every required unit stamps `sustainedDate` and
+   * lets `status` advance further still, in case LCR recording and/or
+   * setting apart were already logged early (see nextStatus).
    */
   async markUnitSustained(
-    workflow: Pick<CallingWorkflow, 'id' | 'unit' | 'sustainedInUnits'>,
+    workflow: Pick<
+      CallingWorkflow,
+      'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'sustainedByPresidencyUnits' | 'recordedDate' | 'setApartDate'
+    >,
     unitNumber: string,
     actor: AppUser,
   ): Promise<void> {
-    const complete = completesSustaining(workflow, unitNumber);
+    const wasStarted = (workflow.sustainedInUnits ?? []).length > 0;
+    const wasFullySustained = isFullySustained(workflow);
+    const nowFullySustained = isFullySustained({
+      ...workflow,
+      sustainedInUnits: [...(workflow.sustainedInUnits ?? []), unitNumber],
+    });
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: nowFullySustained,
+      recorded: !!workflow.recordedDate,
+      setApart: !!workflow.setApartDate,
+    });
+
     await updateDoc(doc(db, COLLECTION, workflow.id), {
       sustainedInUnits: arrayUnion(unitNumber),
-      ...(complete ? { status: 'sustained', sustainedDate: serverTimestamp() } : {}),
+      // A genuine self-report supersedes an earlier "marked by the stake
+      // presidency" flag for this same unit.
+      ...((workflow.sustainedByPresidencyUnits ?? []).includes(unitNumber)
+        ? { sustainedByPresidencyUnits: arrayRemove(unitNumber) }
+        : {}),
+      status,
+      ...(nowFullySustained && !wasFullySustained ? { sustainedDate: serverTimestamp() } : {}),
+      ...(status === 'complete' ? { completedDate: serverTimestamp() } : {}),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
     });
-    if (complete) {
+
+    // Only the two real milestones - the first unit in (entering
+    // Finalizing) and the last one (fully sustained) - are worth an
+    // audit line; the routine check-ins between them stay silent, same
+    // as before.
+    if (!wasStarted || (nowFullySustained && !wasFullySustained)) {
+      const noteParts: string[] = [];
+      if (!wasStarted) noteParts.push('Sustaining begun.');
+      if (nowFullySustained && !wasFullySustained) noteParts.push('Sustained in every unit.');
+      if (status === 'complete') noteParts.push('This closes the workflow.');
       await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
-        status: 'sustained',
+        status,
         changedBy: actor.firebaseUid,
         changedByName: actor.displayName,
         changedAt: serverTimestamp(),
-        note: 'Sustained in every unit.',
+        note: noteParts.join(' '),
       });
     }
   }
 
   /** Undo a mis-click - removes one unit from the sustained-in list. */
-  async unmarkUnitSustained(workflowId: string, unitNumber: string, actor: AppUser): Promise<void> {
-    await updateDoc(doc(db, COLLECTION, workflowId), {
+  async unmarkUnitSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'recordedDate' | 'setApartDate'
+    >,
+    unitNumber: string,
+    actor: AppUser,
+  ): Promise<void> {
+    const remainingUnits = (workflow.sustainedInUnits ?? []).filter((u) => u !== unitNumber);
+    const status = this.statusAfterRemovingUnits(workflow, remainingUnits);
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
       sustainedInUnits: arrayRemove(unitNumber),
+      sustainedByPresidencyUnits: arrayRemove(unitNumber),
+      status,
+      ...(isFullySustained({ ...workflow, sustainedInUnits: remainingUnits })
+        ? {}
+        : { sustainedDate: deleteField() }),
+      ...(status === 'complete' ? {} : { completedDate: deleteField() }),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
     });
   }
 
   /**
+   * Stake Presidency bulk action: marks every required unit that hasn't
+   * yet reported as sustained, in one write. Units that already reported
+   * keep their own sustaining details; only the newly-added ones are
+   * flagged in `sustainedByPresidencyUnits` (see
+   * CallingWorkflow.sustainedByPresidencyUnits and
+   * undoMarkAllUnitsSustained), so they're both distinguishable in the
+   * UI and selectively undoable. No-ops (returns an empty list) if every
+   * required unit already reported. Returns the units it marked, for the
+   * caller's confirmation UI / toast.
+   */
+  async markAllUnitsSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'recordedDate' | 'setApartDate'
+    >,
+    actor: AppUser,
+  ): Promise<string[]> {
+    const done = new Set(workflow.sustainedInUnits ?? []);
+    const missing = requiredUnitsFor(workflow).filter((u) => !done.has(u));
+    if (missing.length === 0) return [];
+
+    // Adding every missing unit necessarily completes the sustaining.
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: true,
+      recorded: !!workflow.recordedDate,
+      setApart: !!workflow.setApartDate,
+    });
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      sustainedInUnits: arrayUnion(...missing),
+      sustainedByPresidencyUnits: arrayUnion(...missing),
+      status,
+      sustainedDate: serverTimestamp(),
+      ...(status === 'complete' ? { completedDate: serverTimestamp() } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note:
+        `Marked sustained by the Stake Presidency: ${missing.map(unitLabel).join(', ')}.` +
+        (status === 'complete' ? ' This closes the workflow.' : ''),
+    });
+
+    return missing;
+  }
+
+  /**
+   * Undo markAllUnitsSustained - removes exactly the units that bulk
+   * action added (`sustainedByPresidencyUnits`), leaving any unit that
+   * separately self-reported (before or since) untouched. No-op if
+   * nothing was ever bulk-marked.
+   */
+  async undoMarkAllUnitsSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      | 'id'
+      | 'workflowType'
+      | 'unit'
+      | 'sustainedInUnits'
+      | 'sustainedByPresidencyUnits'
+      | 'recordedDate'
+      | 'setApartDate'
+    >,
+    actor: AppUser,
+  ): Promise<void> {
+    const marked = workflow.sustainedByPresidencyUnits ?? [];
+    if (marked.length === 0) return;
+
+    const remainingUnits = (workflow.sustainedInUnits ?? []).filter((u) => !marked.includes(u));
+    const status = this.statusAfterRemovingUnits(workflow, remainingUnits);
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      sustainedInUnits: arrayRemove(...marked),
+      sustainedByPresidencyUnits: arrayRemove(...marked),
+      status,
+      ...(isFullySustained({ ...workflow, sustainedInUnits: remainingUnits })
+        ? {}
+        : { sustainedDate: deleteField() }),
+      ...(status === 'complete' ? {} : { completedDate: deleteField() }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: `Undid the Stake Presidency's sustaining mark for: ${marked.map(unitLabel).join(', ')}.`,
+    });
+  }
+
+  /**
+   * Shared by unmarkUnitSustained/undoMarkAllUnitsSustained: what
+   * `status` should become once `remainingUnits` is what's left after
+   * removing some units. If literally nothing has happened yet (no
+   * units, no recording, no setting apart), this genuinely reverts to
+   * the pre-Finalizing status; otherwise nextStatus already handles a
+   * drop below full sustaining correctly (it always rests at `sustained`
+   * whenever `fullySustained` is false, regardless of the other facts).
+   */
+  private statusAfterRemovingUnits(
+    workflow: Pick<CallingWorkflow, 'workflowType' | 'unit' | 'recordedDate' | 'setApartDate'>,
+    remainingUnits: string[],
+  ): CallingStatus | ReleaseStatus {
+    const nothingLeft = remainingUnits.length === 0 && !workflow.recordedDate && !workflow.setApartDate;
+    if (nothingLeft) {
+      return workflow.workflowType === 'release' ? 'released' : 'accepted';
+    }
+    return this.nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained({ ...workflow, sustainedInUnits: remainingUnits }),
+      recorded: !!workflow.recordedDate,
+      setApart: !!workflow.setApartDate,
+    });
+  }
+
+  /**
    * Sustain and set apart in one write - used when the person being
    * released or called is physically present with the presidency member
-   * or high councilor right as the sustaining completes (see
-   * core/sunday-visit.ts's canCombineSustainAndSetApart). For a
-   * stake-wide workflow this also folds in the completing unit mark;
-   * ward/branch workflows have no checklist, so `unitNumber` is omitted.
+   * or high councilor recording it (see core/sunday-visit.ts's
+   * canCombineSustainAndSetApart - no longer required to be the unit
+   * that completes a stake-wide calling's sustaining, just the person's
+   * own unit). For a stake-wide workflow this also folds in the visited
+   * unit's sustaining mark; a ward/branch workflow has no checklist, so
+   * its own `unit` is what gets folded in instead.
    */
   async sustainAndSetApart(
-    workflow: Pick<CallingWorkflow, 'id'>,
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'recordedDate'>,
     unitNumber: string | undefined,
     actor: AppUser,
   ): Promise<void> {
+    const unitToAdd = unitNumber ?? workflow.unit;
+    const wasFullySustained = isFullySustained(workflow);
+    const updatedUnits = unitToAdd
+      ? [...(workflow.sustainedInUnits ?? []), unitToAdd]
+      : (workflow.sustainedInUnits ?? []);
+    const nowFullySustained = isFullySustained({ ...workflow, sustainedInUnits: updatedUnits });
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: nowFullySustained,
+      recorded: !!workflow.recordedDate,
+      setApart: true,
+    });
+
     await updateDoc(doc(db, COLLECTION, workflow.id), {
-      status: 'set_apart',
-      sustainedDate: serverTimestamp(),
+      status,
       setApartDate: serverTimestamp(),
       setApartBy: actor.displayName,
-      ...(unitNumber ? { sustainedInUnits: arrayUnion(unitNumber) } : {}),
+      ...(unitToAdd ? { sustainedInUnits: arrayUnion(unitToAdd) } : {}),
+      ...(nowFullySustained && !wasFullySustained ? { sustainedDate: serverTimestamp() } : {}),
+      ...(status === 'complete' ? { completedDate: serverTimestamp() } : {}),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
     });
     await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
-      status: 'set_apart',
+      status,
       changedBy: actor.firebaseUid,
       changedByName: actor.displayName,
       changedAt: serverTimestamp(),
-      note: `Sustained and set apart by ${actor.displayName} in the same visit.`,
+      note:
+        `Sustained and set apart by ${actor.displayName} in the same visit.` +
+        (status === 'complete' ? ' This closes the workflow.' : ''),
+    });
+  }
+
+  /**
+   * Log that the person was set apart - the date, and (optionally, as
+   * today) who performed it. Callable any time once Finalizing has
+   * begun (`status` is `sustained` or `recorded_in_lcr`), independent of
+   * whether sustaining is fully done or LCR recording has happened -
+   * see nextStatus. Replaces advanceStatus(w, 'set_apart', ...) as the
+   * write path for this step.
+   */
+  async logSetApart(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'recordedDate'>,
+    actor: AppUser,
+    setApartBy?: string,
+  ): Promise<void> {
+    if (!this.hasEnteredFinalizing(workflow.status)) return;
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: !!workflow.recordedDate,
+      setApart: true,
+    });
+    const trimmedSetApartBy = setApartBy?.trim();
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status,
+      setApartDate: serverTimestamp(),
+      ...(trimmedSetApartBy ? { setApartBy: trimmedSetApartBy } : {}),
+      ...(status === 'complete' ? { completedDate: serverTimestamp() } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+
+    const noteParts = ['Set apart.'];
+    if (trimmedSetApartBy) noteParts.push(`Set apart by ${trimmedSetApartBy}.`);
+    if (status === 'complete') noteParts.push('This closes the workflow.');
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: noteParts.join(' '),
+    });
+  }
+
+  /** Undo a set-apart log - for a mis-click, or one recorded too early. */
+  async undoSetApart(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'recordedDate'>,
+    actor: AppUser,
+  ): Promise<void> {
+    if (!this.hasEnteredFinalizing(workflow.status)) return;
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: !!workflow.recordedDate,
+      setApart: false,
+    });
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status,
+      setApartDate: deleteField(),
+      setApartBy: deleteField(),
+      ...(status === 'complete' ? {} : { completedDate: deleteField() }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: 'Setting apart undone.',
+    });
+  }
+
+  /**
+   * Mark that this workflow has been recorded in LCR - manually, by the
+   * Stake Presidency, outside the app; this only records that it
+   * happened, when, and by whom (via the audit history below). Callable
+   * any time once Finalizing has begun, independent of setting apart -
+   * see nextStatus. Deliberately does NOT close the workflow by itself
+   * unless sustaining and setting apart (for a calling) are also already
+   * done. Presidency-only (see firestore.rules and core/roles.ts).
+   */
+  async recordInLcr(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'setApartDate'>,
+    actor: AppUser,
+  ): Promise<void> {
+    if (!this.hasEnteredFinalizing(workflow.status)) return;
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: true,
+      setApart: !!workflow.setApartDate,
+    });
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status,
+      recordedDate: serverTimestamp(),
+      ...(status === 'complete' ? { completedDate: serverTimestamp() } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+
+    const noteParts = ['Recorded in LCR.'];
+    if (status === 'complete') noteParts.push('This closes the workflow.');
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: noteParts.join(' '),
+    });
+
+    // The local roster may now be behind LCR - see RosterSyncService.
+    await this.rosterSync.flagRequired(actor);
+  }
+
+  /** Undo an LCR-recorded mark - for a mis-click, or one recorded too early. */
+  async undoRecordInLcr(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'setApartDate'>,
+    actor: AppUser,
+  ): Promise<void> {
+    if (!this.hasEnteredFinalizing(workflow.status)) return;
+    const status = this.nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: false,
+      setApart: !!workflow.setApartDate,
+    });
+
+    await updateDoc(doc(db, COLLECTION, workflow.id), {
+      status,
+      recordedDate: deleteField(),
+      ...(status === 'complete' ? {} : { completedDate: deleteField() }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: serverTimestamp(),
+    });
+
+    await addDoc(collection(db, COLLECTION, workflow.id, 'history'), {
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: serverTimestamp(),
+      note: 'LCR recording undone.',
     });
   }
 

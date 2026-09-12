@@ -9,12 +9,17 @@ import {
   canAdvanceStatus,
   canDeleteWorkflow,
   canEditNotes,
+  canLogSetApart,
+  canMarkAllUnitsSustained,
+  canRecordInLcr,
   canRollbackStatus,
+  canUndoRecordInLcr,
+  canUndoSetApart,
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
 import { namesFor, tally } from '../../core/hc-review';
-import { stakeUnits, workflowScopeLabel } from '../../core/units';
+import { stakeUnits, unitLabel, workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';
 import { PeopleService } from '../../core/people.service';
@@ -49,6 +54,22 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
   >;
 }
 
+/**
+ * The badge label for a workflow's *current* status - same as
+ * labelsFor()[status] except `recorded_in_lcr` reads as "Awaiting
+ * setting apart" instead of "Recorded in LCR". Once Finalizing's
+ * nextStatus() rests a workflow at `recorded_in_lcr`, that already means
+ * fully sustained + recorded + not yet set apart (see
+ * CallingsService.nextStatus), so no separate condition is needed to
+ * know when to show the friendlier label. This is display-only - never
+ * written to storage - and history rows keep showing the plain literal
+ * label for what actually happened at that point in time.
+ */
+function displayStatusLabel(w: CallingWorkflow): string {
+  if (w.status === 'recorded_in_lcr') return 'Awaiting setting apart';
+  return labelsFor(w)[w.status] ?? w.status;
+}
+
 @Component({
   selector: 'app-calling-detail',
   standalone: true,
@@ -71,7 +92,7 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
               </p>
             }
           </div>
-          <app-status-badge [status]="w.status" [label]="labelsFor(w)[w.status] ?? w.status" />
+          <app-status-badge [status]="w.status" [label]="displayStatusLabel(w)" />
         </div>
 
         @if (authorities(); as a) {
@@ -256,12 +277,135 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
                   (change)="toggleUnitSustained(w, u.number, $any($event.target).checked)"
                 />
                 {{ u.name }}
+                @if (isUnitMarkedByPresidency(w, u.number)) {
+                  <span class="text-sm muted">(marked by Stake Presidency)</span>
+                }
               </label>
+            }
+            @if (!sustainingComplete() && canMarkAllUnitsSustained(authService.appUser())) {
+              @if (confirmingMarkAllUnits()) {
+                <div class="confirm stack">
+                  <span class="text-sm">
+                    Mark the remaining {{ missingUnits().length }} unit{{ missingUnits().length === 1 ? '' : 's' }}
+                    sustained: {{ missingUnits().map(unitLabel).join(', ') }}?
+                  </span>
+                  <div class="row">
+                    <button class="btn btn-primary" [disabled]="busy()" (click)="markAllUnitsSustained(w)">
+                      Yes, mark all as sustained
+                    </button>
+                    <button class="btn" [disabled]="busy()" (click)="confirmingMarkAllUnits.set(false)">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn-responsive"
+                  [disabled]="busy()"
+                  (click)="confirmingMarkAllUnits.set(true)"
+                >
+                  Mark all units sustained
+                </button>
+              }
+            }
+            @if ((w.sustainedByPresidencyUnits ?? []).length > 0 && isPresidency(authService.appUser())) {
+              <button
+                type="button"
+                class="btn text-sm"
+                style="align-self: flex-start"
+                [disabled]="busy()"
+                (click)="undoMarkAllUnitsSustained(w)"
+              >
+                Undo the Stake Presidency's bulk sustaining mark
+              </button>
+            }
+          </div>
+        }
+
+        @if (inFinalizing() && w.workflowType === 'calling') {
+          <div class="card stack">
+            <strong>Set apart</strong>
+            @if (w.setApartDate) {
+              <p class="text-sm" style="margin: 0">
+                Set apart on {{ formatTimestamp(w.setApartDate) }}
+                @if (w.setApartBy) {
+                  — by {{ w.setApartBy }}
+                }
+              </p>
+              @if (canUndoSetApart(authService.appUser(), w)) {
+                <button class="btn btn-responsive" [disabled]="busy()" (click)="undoSetApart(w)">
+                  Undo setting apart
+                </button>
+              }
+            } @else if (canLogSetApart(authService.appUser(), w)) {
+              <div class="field">
+                @if (isHighCouncil(authService.appUser())) {
+                  <!-- Firestore rules only let a high councilor record
+                       set_apart with their OWN recorded name - they
+                       can't attribute it to anyone else - so there's
+                       nothing to pick here. -->
+                  <label>Set apart by</label>
+                  <p class="text-sm" style="margin: 0">
+                    You, {{ authService.appUser()?.displayName }}.
+                  </p>
+                } @else {
+                  <label>Set apart by (optional)</label>
+                  @if (eligibleExtenders().length > 0) {
+                    <select
+                      [ngModel]="pendingSetApartBy()"
+                      (ngModelChange)="pendingSetApartBy.set($event)"
+                    >
+                      <option value="">— unspecified —</option>
+                      @for (p of eligibleExtenders(); track p.id) {
+                        <option [value]="p.name">
+                          {{ p.name }} — {{ eligibilityLabel(p) }}
+                        </option>
+                      }
+                    </select>
+                  } @else {
+                    <input
+                      [ngModel]="pendingSetApartBy()"
+                      (ngModelChange)="pendingSetApartBy.set($event)"
+                      placeholder="Name (optional)"
+                    />
+                  }
+                }
+              </div>
+              <button class="btn btn-primary btn-responsive" [disabled]="busy()" (click)="logSetApart(w)">
+                Log set apart
+              </button>
+            } @else {
+              <p class="text-sm muted" style="margin: 0">Not yet set apart.</p>
+            }
+          </div>
+        }
+
+        @if (inFinalizing()) {
+          <div class="card stack">
+            <strong>Recorded in LCR</strong>
+            @if (w.recordedDate) {
+              <p class="text-sm" style="margin: 0">Recorded on {{ formatTimestamp(w.recordedDate) }}</p>
+              @if (canUndoRecordInLcr(authService.appUser())) {
+                <button class="btn btn-responsive" [disabled]="busy()" (click)="undoRecordInLcr(w)">
+                  Undo recorded mark
+                </button>
+              }
+            } @else if (canRecordInLcr(authService.appUser())) {
+              <p class="text-sm muted" style="margin: 0">
+                Recording is done manually in LCR - this only records that it happened.
+              </p>
+              <button class="btn btn-primary btn-responsive" [disabled]="busy()" (click)="recordInLcr(w)">
+                Mark recorded in LCR
+              </button>
+            } @else {
+              <p class="text-sm muted" style="margin: 0">Not yet recorded in LCR.</p>
             }
           </div>
         }
 
         @for (s of nextStatuses(); track s) {
+          @if (s !== 'set_apart' && s !== 'recorded_in_lcr' && s !== 'complete') {
           @if (canAdvance(w.status, s) && advanceButtonEnabled(w, s)) {
             <div class="card stack">
               <strong>Advance status</strong>
@@ -296,41 +440,6 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
                   </span>
                 </div>
               }
-              @if (s === 'set_apart') {
-                <div class="field">
-                  @if (isHighCouncil(authService.appUser())) {
-                    <!-- Firestore rules only let a high councilor record
-                         set_apart with their OWN recorded name - they
-                         can't attribute it to anyone else - so there's
-                         nothing to pick here. -->
-                    <label>Set apart by</label>
-                    <p class="text-sm" style="margin: 0">
-                      You, {{ authService.appUser()?.displayName }}.
-                    </p>
-                  } @else {
-                    <label>Set apart by (optional)</label>
-                    @if (eligibleExtenders().length > 0) {
-                      <select
-                        [ngModel]="pendingSetApartBy()"
-                        (ngModelChange)="pendingSetApartBy.set($event)"
-                      >
-                        <option value="">— unspecified —</option>
-                        @for (p of eligibleExtenders(); track p.id) {
-                          <option [value]="p.name">
-                            {{ p.name }} — {{ eligibilityLabel(p) }}
-                          </option>
-                        }
-                      </select>
-                    } @else {
-                      <input
-                        [ngModel]="pendingSetApartBy()"
-                        (ngModelChange)="pendingSetApartBy.set($event)"
-                        placeholder="Name (optional)"
-                      />
-                    }
-                  }
-                </div>
-              }
               <button
                 class="btn btn-primary btn-responsive"
                 [disabled]="busy() || (s === 'interview_assigned' && !pendingAssignee().trim())"
@@ -345,13 +454,14 @@ function labelsFor(w: CallingWorkflow): Record<string, string> {
               advance from here.
             </p>
           }
+          }
         }
 
         @if (w.status === 'complete') {
           <p class="muted text-sm">This workflow is complete.</p>
         }
 
-        @if (canRollbackStatus(authService.appUser())) {
+        @if (canRollbackStatus(authService.appUser()) && !inFinalizing()) {
           @if (previousStatus(); as prev) {
             <div class="card stack rollback-zone">
               @if (confirmingRollback()) {
@@ -520,10 +630,17 @@ export class CallingDetailComponent {
   protected readonly canEditNotes = canEditNotes;
   protected readonly canDeleteWorkflow = canDeleteWorkflow;
   protected readonly canRollbackStatus = canRollbackStatus;
+  protected readonly canLogSetApart = canLogSetApart;
+  protected readonly canUndoSetApart = canUndoSetApart;
+  protected readonly canRecordInLcr = canRecordInLcr;
+  protected readonly canUndoRecordInLcr = canUndoRecordInLcr;
+  protected readonly canMarkAllUnitsSustained = canMarkAllUnitsSustained;
   protected readonly isHighCouncil = isHighCouncil;
   protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
+  protected readonly unitLabel = unitLabel;
   protected readonly labelsFor = labelsFor;
+  protected readonly displayStatusLabel = displayStatusLabel;
   protected readonly formatTimestamp = formatTimestamp;
   protected readonly hcTotal = HC_TOTAL;
   protected readonly APPROVAL_LABELS = APPROVAL_LABELS;
@@ -602,9 +719,7 @@ export class CallingDetailComponent {
     const w = this.workflow();
     const p = this.person();
     if (!w || !p) return null;
-    if (w.status === 'set_apart' || w.status === 'recorded_in_lcr' || w.status === 'complete') {
-      return null;
-    }
+    if (w.setApartDate) return null;
     const req = priesthoodRequirementFor(w.callingName);
     if (req === 'none') return null;
     if (personSatisfiesPriesthood(p.priesthoodOffice, req)) return null;
@@ -627,14 +742,22 @@ export class CallingDetailComponent {
   });
 
   /**
-   * A stake-level workflow (no `unit`) one step away from `sustained`
-   * needs a sustaining vote in every ward/branch before it can advance -
-   * there's no stake conference to sustain it at instead. Ward/branch
-   * workflows already carry their one unit and don't need the checklist.
+   * A stake-level workflow (no `unit`) not yet fully sustained still
+   * needs a sustaining vote in every ward/branch - there's no stake
+   * conference to sustain it at instead. `status` moves to `sustained`
+   * the moment the FIRST unit reports (entering Finalizing), so this can
+   * no longer just check "next status is sustained" the way it used to -
+   * it stays visible through the whole partial-sustaining window, not
+   * only before the first unit. Ward/branch workflows already carry
+   * their one unit and don't need the checklist.
    */
   protected readonly showSustainingChecklist = computed(() => {
     const w = this.workflow();
-    return !!w && !w.unit && this.nextStatuses().includes('sustained');
+    if (!w || w.unit) return false;
+    return (
+      (w.status === 'accepted' || w.status === 'released' || w.status === 'sustained') &&
+      !this.sustainingComplete()
+    );
   });
 
   protected readonly sustainedUnitCount = computed(
@@ -646,6 +769,24 @@ export class CallingDetailComponent {
     if (!w) return false;
     const done = new Set(w.sustainedInUnits ?? []);
     return this.stakeUnitsList.every((u) => done.has(u.number));
+  });
+
+  /** Required units this stake-wide workflow hasn't sustained yet - the
+   *  list "Mark all units sustained" would add. */
+  protected readonly missingUnits = computed(() => {
+    const w = this.workflow();
+    if (!w) return [];
+    const done = new Set(w.sustainedInUnits ?? []);
+    return this.stakeUnitsList.filter((u) => !done.has(u.number)).map((u) => u.number);
+  });
+
+  /** Whether Finalizing has begun - drives the Set apart / Recorded in
+   *  LCR cards, which apply once at least one unit has sustained. */
+  protected readonly inFinalizing = computed(() => {
+    const w = this.workflow();
+    return (
+      !!w && (w.status === 'sustained' || w.status === 'set_apart' || w.status === 'recorded_in_lcr' || w.status === 'complete')
+    );
   });
 
   /** People eligible to extend the calling and/or set the person apart —
@@ -699,6 +840,7 @@ export class CallingDetailComponent {
   protected readonly confirmingApproval = signal(false);
   protected readonly confirmingRollback = signal(false);
   protected readonly confirmingDelete = signal(false);
+  protected readonly confirmingMarkAllUnits = signal(false);
 
   constructor() {
     // Seed the notes textarea once the workflow first loads, without
@@ -741,6 +883,10 @@ export class CallingDetailComponent {
     return (w.sustainedInUnits ?? []).includes(unitNumber);
   }
 
+  isUnitMarkedByPresidency(w: CallingWorkflow, unitNumber: string): boolean {
+    return (w.sustainedByPresidencyUnits ?? []).includes(unitNumber);
+  }
+
   async toggleUnitSustained(w: CallingWorkflow, unitNumber: string, checked: boolean): Promise<void> {
     const actor = this.authService.appUser();
     if (!actor) return;
@@ -749,7 +895,7 @@ export class CallingDetailComponent {
       if (checked) {
         await this.callingsService.markUnitSustained(w, unitNumber, actor);
       } else {
-        await this.callingsService.unmarkUnitSustained(w.id, unitNumber, actor);
+        await this.callingsService.unmarkUnitSustained(w, unitNumber, actor);
       }
     } finally {
       this.busy.set(false);
@@ -867,6 +1013,75 @@ export class CallingDetailComponent {
     try {
       await this.callingsService.rollbackStatus(w, actor);
       this.confirmingRollback.set(false);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async markAllUnitsSustained(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.markAllUnitsSustained(w, actor);
+      this.confirmingMarkAllUnits.set(false);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async undoMarkAllUnitsSustained(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.undoMarkAllUnitsSustained(w, actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async logSetApart(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      const setApartBy = isHighCouncil(actor) ? actor.displayName : this.pendingSetApartBy().trim();
+      await this.callingsService.logSetApart(w, actor, setApartBy);
+      this.pendingSetApartBy.set('');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async undoSetApart(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.undoSetApart(w, actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async recordInLcr(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.recordInLcr(w, actor);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async undoRecordInLcr(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.undoRecordInLcr(w, actor);
     } finally {
       this.busy.set(false);
     }

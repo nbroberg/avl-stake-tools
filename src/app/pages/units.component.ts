@@ -5,7 +5,7 @@ import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PeopleService } from '../core/people.service';
 import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
-import { canAdvanceStatus, isHighCouncil } from '../core/roles';
+import { canAdvanceStatus, canLogSetApart, isHighCouncil } from '../core/roles';
 import {
   canCombineSustainAndSetApart,
   isPersonPresentInUnit,
@@ -231,6 +231,9 @@ import {
               <div>
                 <a [routerLink]="['/callings', row.workflow.id]">{{ row.workflow.personName }}</a>
                 <span class="muted"> — {{ row.workflow.callingName }}</span>
+                @if (row.workflow.status === 'recorded_in_lcr') {
+                  <p class="text-sm muted" style="margin: 0.15rem 0 0">Awaiting setting apart</p>
+                }
               </div>
               @if (row.canAct) {
                 <button class="btn btn-primary" [disabled]="busy()" (click)="setApart(row.workflow)">
@@ -404,7 +407,7 @@ export class UnitsComponent {
       .filter((w) => isPersonPresentInUnit(w, this.personFor(w), unit))
       .map((w) => ({
         workflow: w,
-        canAct: canAdvanceStatus(actor, w.status, 'set_apart'),
+        canAct: canLogSetApart(actor, w),
       }));
   });
 
@@ -484,9 +487,7 @@ export class UnitsComponent {
     if (!actor) return;
     this.busy.set(true);
     try {
-      await this.callingsService.advanceStatus(w, 'set_apart', actor, {
-        setApartBy: actor.displayName,
-      });
+      await this.callingsService.logSetApart(w, actor, actor.displayName);
     } finally {
       this.busy.set(false);
     }

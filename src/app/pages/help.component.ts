@@ -23,13 +23,17 @@ import { Component } from '@angular/core';
         <p>
           <strong>Stake Presidency</strong> — full access: create and edit any calling, release,
           or priesthood advancement; delete a workflow created in error; advance or roll back any
-          step; override sustaining requirements when needed.
+          step; override sustaining requirements when needed, including bulk-marking every
+          outstanding unit sustained at once; and the only role that can mark (or undo marking) a
+          calling or release recorded in LCR.
         </p>
         <p style="margin: 0">
           <strong>High Council</strong> — can see everything, but can only act at specific points:
           casting a vote (approve or raise a concern) once a proposal reaches Stake Presidency
-          Approved, and recording what happens during a Sunday visit to a unit — sustaining,
-          releasing, setting apart, or ordaining, in person.
+          Approved; recording what happens during a Sunday visit to a unit — sustaining,
+          releasing, setting apart, or ordaining, in person; and, once a calling has begun
+          Finalizing, logging that it was set apart even outside a Sunday visit, always under
+          their own name.
         </p>
         <p class="muted text-sm" style="margin: 0">
           Your role is set by whoever administers the app for your stake — there's no way to
@@ -48,6 +52,8 @@ import { Component } from '@angular/core';
           <dd>Everything currently waiting on you, and — for the presidency — everything waiting stake-wide.</dd>
           <dt>Callings</dt>
           <dd>Every calling and release workflow, from proposal through completion.</dd>
+          <dt>LCR Recording</dt>
+          <dd>Stake Presidency only. Everything at least one unit has sustained but LCR hasn't recorded yet.</dd>
           <dt>Advancements</dt>
           <dd>Priest → Elder and Elder → High Priest workflows.</dd>
         </dl>
@@ -96,18 +102,25 @@ import { Component } from '@angular/core';
           <li><strong>Interview Assigned</strong> — someone is assigned to interview the person and extend the calling.</li>
           <li><strong>Interview / Calling Extended</strong> — the interview happened and the calling was extended.</li>
           <li><strong>Accepted</strong> — the person accepted.</li>
-          <li><strong>Sustained</strong> — see Sustaining below; can combine with setting apart in one visit.</li>
-          <li><strong>Set Apart</strong> — the person was set apart, and by whom.</li>
-          <li><strong>Recorded in LCR</strong> — finalizes straight through to Complete in the same step.</li>
-          <li><strong>Complete.</strong></li>
+          <li>
+            <strong>Finalizing</strong> — entered the moment one unit sustains the calling. From
+            here, sustaining (every unit, not just one), recording in LCR, and setting apart are
+            tracked independently and can happen in any order — see Sustaining and setting apart
+            below. The status shown is whichever of <strong>Sustained</strong>,
+            <strong>Set Apart</strong>, or <strong>Recorded in LCR</strong> (shown as
+            "Awaiting setting apart" once that's the only thing left) best reflects what's
+            actually happened so far.
+          </li>
+          <li><strong>Complete</strong> — reached automatically once every unit has sustained it, it's recorded in LCR, and it's been set apart. Nothing to click.</li>
         </ol>
         <p style="margin: 0">
-          A <strong>release</strong> is shorter and skips both the high council vote and the
-          interview assignment:
+          A <strong>release</strong> is shorter, skips both the high council vote and the
+          interview assignment, and has no setting-apart step — otherwise the same Finalizing
+          rules apply:
         </p>
         <p class="muted" style="margin: 0">
-          Proposed → Stake Presidency Approved → Release Extended → Released → Sustained →
-          Recorded in LCR → Complete
+          Proposed → Stake Presidency Approved → Release Extended → Released → Finalizing
+          (Sustained / Recorded in LCR) → Complete
         </p>
         <p class="text-sm muted" style="margin: 0">
           Every workflow's detail page has a History section at the bottom showing every status
@@ -146,23 +159,38 @@ import { Component } from '@angular/core';
       </div>
 
       <div class="card stack">
-        <h2 style="margin: 0">Sustaining and setting apart</h2>
+        <h2 style="margin: 0">Sustaining, recording, and setting apart</h2>
         <p style="margin: 0">
           A ward, branch, or elders quorum calling is sustained once, in that unit. A
           <strong>stake-level</strong> calling has no single stake conference to sustain it at in
           this app's model, so it's sustained ward by ward as the presidency or council visits
-          each unit — the detail page shows how many units have signed off so far.
+          each unit — the detail page shows how many units have signed off so far, and the
+          calling enters Finalizing the moment the first one does.
         </p>
         <p style="margin: 0">
-          The presidency can mark a stake-wide calling sustained even before every unit confirms,
-          if genuinely necessary — doing so leaves a note recording how many units had actually
-          signed off at the time.
+          The presidency can mark individual units sustained even before every unit confirms, or
+          use <strong>Mark all units sustained</strong> to bulk-mark everything still outstanding
+          at once (after a confirmation listing which units) — units marked this way show
+          "marked by Stake Presidency" next to them, and that bulk mark can be undone on its own
+          without touching any unit that reported for itself.
+        </p>
+        <p style="margin: 0">
+          Once Finalizing has begun, recording in LCR and setting apart can each happen at any
+          time, in either order — recording doesn't require setting apart first, and vice versa.
+          Recording is still done manually in LCR; the <strong>LCR Recording</strong> page (Stake
+          Presidency only) lists every calling and release waiting on it, and marking it here only
+          records that it happened, when, and by whom, without closing the workflow on its own.
+          A calling closes only once it's fully sustained, recorded, <em>and</em> set apart; a
+          release doesn't need setting apart. Both the recorded mark and the set-apart mark can be
+          undone.
         </p>
         <p class="text-sm muted" style="margin: 0">
           Setting apart is recorded from the calling's detail page, or from Units on the Sunday
-          you're actually with the person. If the same visit both sustains someone and completes a
-          stake-wide calling's sustaining, the app offers "Sustain &amp; set apart" as one combined
-          action.
+          you're actually with the person. If the same visit both sustains someone and sets them
+          apart, the app offers "Sustain &amp; set apart" as one combined action — it no longer
+          has to be the visit that finishes a stake-wide calling's sustaining. A calling that's
+          fully sustained and recorded but not yet set apart shows as "Awaiting setting apart", in
+          both the stake-wide list and the person's home unit's view.
         </p>
       </div>
 
@@ -188,9 +216,12 @@ import { Component } from '@angular/core';
         <p style="margin: 0">
           Pick the ward or branch you're visiting to see four lists, filtered to just what's ready
           to act on today: <strong>Needs sustaining</strong>, <strong>Releases</strong>,
-          <strong>Needs setting apart</strong>, and <strong>Ordinations pending</strong>. Proposing
-          new callings, casting HC votes, and adding notes still happen from the
-          Callings/Advancements pages themselves.
+          <strong>Needs setting apart</strong>, and <strong>Ordinations pending</strong>. A stake
+          calling that's fully sustained and recorded but still needs setting apart shows
+          "Awaiting setting apart" there too, even though the calling itself belongs to the
+          stake, not the unit - it's a reminder, since that's most likely where the person
+          attends. Proposing new callings, casting HC votes, and adding notes still happen from
+          the Callings/Advancements pages themselves.
         </p>
       </div>
 

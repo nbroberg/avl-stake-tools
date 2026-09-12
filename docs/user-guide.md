@@ -25,19 +25,25 @@ There are two roles in this app:
 
 - **Stake Presidency** — full access: create and edit any calling, release,
   or priesthood advancement; delete a workflow created in error; advance or
-  roll back any step; override sustaining requirements when needed.
+  roll back any step; override sustaining requirements when needed,
+  including bulk-marking every outstanding unit sustained at once; and the
+  only role that can mark (or undo marking) a calling or release recorded
+  in LCR, from the **LCR Recording** page.
 - **High Council** — can see everything, but can only act at specific
   points: casting a vote (approve or raise a concern) on a proposal once
-  it's reached Stake Presidency Approved, and recording what happens during
-  a Sunday visit to a unit — sustaining, releasing, setting apart, or
-  ordaining, in person.
+  it's reached Stake Presidency Approved; recording what happens during a
+  Sunday visit to a unit — sustaining, releasing, setting apart, or
+  ordaining, in person; and, once a calling has begun Finalizing, logging
+  that it was set apart even outside a Sunday visit, always under their
+  own name.
 
 Your role is set by whoever administers the app for your stake — there's no
 way to change your own role or anyone else's from inside the app.
 
 ## Getting around
 
-The navigation bar has six sections:
+The navigation bar has these sections (an extra one, **LCR Recording**,
+only shows for the presidency):
 
 - **Dashboard** — your starting point after signing in.
 - **Units** — pick the ward or branch you're visiting this Sunday to see
@@ -46,6 +52,8 @@ The navigation bar has six sections:
   presidency) everything waiting stake-wide.
 - **Callings & Releases** — every calling and release workflow, from
   proposal through completion.
+- **LCR Recording** — Stake Presidency only. Every calling and release at
+  least one unit has sustained but LCR hasn't recorded yet.
 - **Priesthood Advancements** — Priest → Elder and Elder → High Priest
   workflows.
 - **Diagnostics** — a connectivity check page, useful if the app seems
@@ -97,9 +105,11 @@ detail page.
 
 ## The calling lifecycle
 
-A new calling moves through ten steps in order — nothing can be skipped,
-and (apart from the presidency's override abilities below) each step needs
-the right person to act:
+A new calling moves through these steps in order — nothing can be
+skipped, and (apart from the presidency's override abilities below) each
+step needs the right person to act. The last three (sustaining fully,
+recording in LCR, and setting apart) aren't strictly sequential once
+Finalizing begins - see step 7:
 
 1. **Proposed** — created by the presidency.
 2. **Stake Presidency Approved** — the presidency's own sign-off.
@@ -113,20 +123,24 @@ the right person to act:
 5. **Interview / Calling Extended** — the interview happened and the
    calling was extended.
 6. **Accepted** — the person accepted.
-7. **Sustained** — see [Sustaining](#sustaining) below; can be combined
-   with setting apart in one visit.
-8. **Set Apart** — the person was set apart, and by whom.
-9. **Recorded in LCR** — marking this finalizes the workflow straight
-   through to **Complete** in the same step, since there's nothing left to
-   do once LCR has it.
-10. **Complete.**
+7. **Finalizing** — entered the moment **one** unit sustains the calling
+   (not every unit — see [Sustaining, recording, and setting
+   apart](#sustaining-recording-and-setting-apart) below). From here,
+   sustaining every remaining unit, recording in LCR, and setting apart
+   are tracked independently and can happen in any order. What you'll
+   actually see as the status is whichever of **Sustained**, **Set
+   Apart**, or **Recorded in LCR** (shown as "Awaiting setting apart"
+   once that's the only thing left) best reflects what's true so far —
+   there's deliberately no combined status value.
+8. **Complete** — reached automatically once the calling is fully
+   sustained, recorded in LCR, and set apart. Nothing to click.
 
-A **release** is shorter — seven steps, and it skips both the high council
-vote and the interview assignment, since an ordinary stake calling doesn't
-go back through the council to be released:
+A **release** is shorter — it skips both the high council vote and the
+interview assignment, since an ordinary stake calling doesn't go back
+through the council to be released, and has no setting-apart step:
 
 **Proposed → Stake Presidency Approved → Release Extended → Released →
-Sustained → Recorded in LCR → Complete**
+Finalizing (Sustained / Recorded in LCR) → Complete**
 
 Every workflow's detail page has a **History** section at the bottom
 showing every status change, who made it, and when — a full audit trail
@@ -159,7 +173,7 @@ stragglers stays a real conversation rather than something the app tracks
 for you. The presidency additionally sees who has approved and who raised
 a concern, by name.
 
-### Sustaining
+### Sustaining, recording, and setting apart
 
 For a ward, branch, or elders quorum calling, sustaining happens once, in
 that unit. For a **stake-level** calling (High Council, stake auxiliaries,
@@ -167,20 +181,39 @@ etc.) there's no single stake conference to sustain it at in this app's
 model, so it's sustained **ward by ward** as the presidency or council
 visits each unit — the workflow's detail page shows how many of the
 stake's units have signed off so far, and lets you check off units as you
-go.
+go. The calling enters Finalizing the moment the first one does.
 
-The presidency can mark a stake-wide calling sustained even before every
-unit has confirmed, if that's genuinely necessary — doing so leaves a clear
-note in the history recording how many units had actually signed off at
-the time, so it's never silent.
+The presidency can mark individual units sustained even before every unit
+has confirmed, if that's genuinely necessary, or use **Mark all units
+sustained** to bulk-mark everything still outstanding at once — a
+confirmation lists which units that will affect first. Units marked this
+way show "marked by Stake Presidency" so they're distinguishable from
+ones a unit reported for itself, and that bulk mark can be undone on its
+own without touching anything self-reported.
 
-### Setting apart
+Once Finalizing has begun, **recording in LCR** and **setting apart** can
+each happen at any time, in either order — recording doesn't require
+setting apart first, and setting apart doesn't require recording first.
+Recording is still done manually in LCR outside this app; the **LCR
+Recording** page (Stake Presidency only) lists every calling and release
+at least one unit has sustained but LCR hasn't recorded yet, and marking
+it here only records that it happened, when, and by whom — it
+deliberately does not close the workflow by itself. A calling closes only
+once it's fully sustained, recorded in LCR, *and* set apart; a release
+doesn't need setting apart. Both the recorded mark and the set-apart mark
+can be undone from the detail page (or, for recording, from the LCR
+Recording page too).
 
-Recorded from the calling's detail page (or from **Units**, on the Sunday
-you're actually with that person — see below). If the same visit is both
-sustaining someone and the last unit a stake-wide calling needed, the app
-offers **Sustain & set apart** as one combined action; otherwise they're
-two separate steps.
+Setting apart is recorded from the calling's detail page, or from
+**Units**, on the Sunday you're actually with that person — see below. If
+the same visit is both sustaining someone and setting them apart, the app
+offers **Sustain & set apart** as one combined action — it no longer has
+to be the visit that finishes a stake-wide calling's sustaining. A
+calling that's fully sustained and recorded but not yet set apart shows
+as **Awaiting setting apart**, both in the stake-wide Callings list and
+in the person's home unit's view on the Units page (the calling still
+belongs to the stake, not the unit — it's a reminder, since that's most
+likely where the person attends).
 
 ## Priesthood Advancements
 
@@ -205,7 +238,11 @@ today:
 
 - **Needs sustaining** — callings and releases ready to be sustained there.
 - **Releases** — releases ready for a vote of thanks.
-- **Needs setting apart** — people ready to be set apart.
+- **Needs setting apart** — people ready to be set apart. A stake calling
+  that's fully sustained and recorded but still needs setting apart shows
+  **Awaiting setting apart** here too, even though the calling itself
+  belongs to the stake, not the unit — it's a reminder, since that's most
+  likely where the person attends.
 - **Ordinations pending** — priesthood advancements ready for ordination.
 
 This page exists purely to answer "what do I do here today" — proposing
@@ -241,7 +278,11 @@ Both are presidency-only, from a workflow's detail page:
 
 - **Roll back** moves a workflow back exactly one step — useful if
   something was advanced by mistake. It's recorded in the history like any
-  other change.
+  other change. Only available before Finalizing begins; once a calling
+  or release has been sustained anywhere, undoing is done through the
+  three Finalizing controls themselves (unmark a unit, undo a recorded
+  mark, undo a set-apart mark) instead, since by then more than one
+  independent fact could need unwinding.
 - **Delete this calling** removes the workflow entirely — for something
   created in error or duplicated. The history behind it is kept even after
   deletion, so the audit trail survives.

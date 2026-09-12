@@ -1,5 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import { HC_QUORUM_REQUIRED } from '../quorum';
+import { isFullySustained } from '../sunday-visit';
 import type {
   AdvancementHistoryEntry,
   AppUser,
@@ -235,6 +236,20 @@ interface WorkflowSeed {
   hcConcerns?: number;
   assignedTo?: string;
   notes?: string;
+  /**
+   * Which stake units have sustained this calling so far - only
+   * meaningful for a stake-wide workflow (no `unit`). See
+   * CallingWorkflow.sustainedInUnits; `status: 'sustained'` alone no
+   * longer implies every unit is in, so seeds that want to demonstrate
+   * the Finalizing checklist need to set this explicitly.
+   */
+  sustainedInUnits?: string[];
+  sustainedByPresidencyUnits?: string[];
+  /** Stamps recordedDate/setApartDate so the Finalizing cards and the
+   *  LCR Recording page have something at each independent stage to
+   *  show, regardless of the order they're listed in here. */
+  recorded?: boolean;
+  setApart?: boolean;
 }
 
 /**
@@ -332,12 +347,32 @@ const WORKFLOW_SEEDS: WorkflowSeed[] = [
     notes: 'Moving out of the stake at the end of the month.',
   },
   {
+    // Finalizing, partway through the stake-wide sustaining checklist -
+    // exercises the "Sustaining across the stake" card, the "Mark all
+    // units sustained" bulk action, and the Units page's per-unit
+    // "Needs sustaining" list for the units that haven't reported yet.
     id: 'wf-primary-2nd',
     workflowType: 'calling',
     personName: 'Genevieve Okonjo',
     callingName: 'Stake Primary Second Counselor',
     status: 'sustained',
     ageDays: 34,
+    sustainedInUnits: [RIVERBEND, LAKEMONT],
+  },
+  {
+    // Fully sustained and recorded, but not yet set apart - the
+    // "Awaiting setting apart" reminder, in both the stake view
+    // (Callings & Releases, this detail page) and the member's home
+    // unit (Units page). Recorded before setting apart, on purpose, to
+    // exercise the "either order" half of Finalizing.
+    id: 'wf-rs-secretary',
+    workflowType: 'calling',
+    personName: 'Colleen Ashby',
+    callingName: 'Stake Relief Society Secretary',
+    status: 'recorded_in_lcr',
+    ageDays: 20,
+    sustainedInUnits: [NORTHGATE, RIVERBEND, SILVERPINE, LAKEMONT, FAIRHAVEN, CEDAR_HOLLOW],
+    recorded: true,
   },
   {
     id: 'wf-eq-asst-sec',
@@ -347,6 +382,9 @@ const WORKFLOW_SEEDS: WorkflowSeed[] = [
     unit: NORTHGATE,
     status: 'complete',
     ageDays: 68,
+    sustainedInUnits: [NORTHGATE],
+    recorded: true,
+    setApart: true,
   },
 ];
 
@@ -364,6 +402,13 @@ export function demoWorkflows(): CallingWorkflow[] {
       status: s.status as CallingWorkflow['status'],
       proposedDate: daysAgo(s.ageDays),
       assignedTo: s.assignedTo,
+      sustainedInUnits: s.sustainedInUnits,
+      sustainedByPresidencyUnits: s.sustainedByPresidencyUnits,
+      sustainedDate: isFullySustained({ unit: s.unit, sustainedInUnits: s.sustainedInUnits })
+        ? daysAgo(Math.max(0, s.ageDays - 5))
+        : undefined,
+      recordedDate: s.recorded ? daysAgo(Math.max(0, s.ageDays - 3)) : undefined,
+      setApartDate: s.setApart ? daysAgo(Math.max(0, s.ageDays - 1)) : undefined,
       // Councilor UIDs are positional: demo-hc-1 is the first high
       // councilor in the roster, so demoHistory() can name them.
       hcApprovalUids: Array.from({ length: s.hcApprovals ?? 0 }, (_, i) => `demo-hc-${i + 1}`),

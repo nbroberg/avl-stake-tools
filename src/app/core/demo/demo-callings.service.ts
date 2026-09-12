@@ -8,20 +8,51 @@ import type {
 } from '../callings.service';
 import { DATE_FIELD_BY_STATUS, getPreviousStatus } from '../calling-status';
 import { HC_QUORUM_REQUIRED } from '../quorum';
+import { isFullySustained, requiredUnitsFor } from '../sunday-visit';
+import { unitLabel } from '../units';
 import type {
   AppUser,
+  CallingStatus,
   CallingStatusHistoryEntry,
   CallingWorkflow,
+  CallingWorkflowType,
   HistoryEntryKind,
+  ReleaseStatus,
 } from '../../models/types';
 import { demoHistory, demoWorkflows } from './demo-data';
+
+/** The three independent Finalizing facts nextStatus derives `status` from -
+ *  mirrors CallingsService's private FinalizingFacts/nextStatus/
+ *  hasEnteredFinalizing exactly, so demo mode exercises the same status
+ *  transitions a real Firestore-backed session would. */
+interface FinalizingFacts {
+  fullySustained: boolean;
+  recorded: boolean;
+  setApart: boolean;
+}
+
+function nextStatus(
+  workflowType: CallingWorkflowType,
+  facts: FinalizingFacts,
+): CallingStatus | ReleaseStatus {
+  if (!facts.fullySustained) return 'sustained';
+  const closed = facts.recorded && (workflowType === 'release' || facts.setApart);
+  if (closed) return 'complete';
+  if (facts.recorded) return 'recorded_in_lcr';
+  if (facts.setApart) return 'set_apart';
+  return 'sustained';
+}
+
+function hasEnteredFinalizing(status: string): boolean {
+  return status === 'sustained' || status === 'set_apart' || status === 'recorded_in_lcr';
+}
 
 /**
  * In-memory stand-in for CallingsService. Mutations mirror the real
  * service's semantics - same status/date fields, same audit-history
  * entries, same arrayUnion-style de-duplication on high council votes -
  * so advancing a workflow in demo mode exercises the same UI branches
- * a real one would. State lives for the life of the page.
+ * a real one would.State lives for the life of the page.
  */
 @Injectable()
 export class DemoCallingsService
@@ -35,6 +66,15 @@ export class DemoCallingsService
       | 'updateNotes'
       | 'deleteWorkflow'
       | 'rollbackStatus'
+      | 'markUnitSustained'
+      | 'unmarkUnitSustained'
+      | 'markAllUnitsSustained'
+      | 'undoMarkAllUnitsSustained'
+      | 'sustainAndSetApart'
+      | 'logSetApart'
+      | 'undoSetApart'
+      | 'recordInLcr'
+      | 'undoRecordInLcr'
       | 'approveByHighCouncil'
       | 'withdrawHighCouncilApproval'
       | 'raiseHighCouncilConcern'
@@ -102,7 +142,7 @@ export class DemoCallingsService
   }
 
   async advanceStatus(
-    workflow: Pick<CallingWorkflow, 'id' | 'workflowType'>,
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit'>,
     newStatus: string,
     actor: AppUser,
     options: AdvanceStatusOptions = {},
@@ -111,6 +151,7 @@ export class DemoCallingsService
     const dateField = DATE_FIELD_BY_STATUS[newStatus];
     const assignedTo = newStatus === 'interview_assigned' ? options.assignedTo?.trim() : undefined;
     const setApartBy = newStatus === 'set_apart' ? options.setApartBy?.trim() : undefined;
+    const sustainsOwnUnit = newStatus === 'sustained' && !!workflow.unit;
 
     this.patch(workflow.id, (w) => ({
       ...w,
@@ -118,6 +159,9 @@ export class DemoCallingsService
       updatedBy: actor.firebaseUid,
       updatedAt: now,
       ...(dateField ? { [dateField]: now } : {}),
+      ...(sustainsOwnUnit
+        ? { sustainedInUnits: [...(w.sustainedInUnits ?? []), workflow.unit as string] }
+        : {}),
       ...(assignedTo ? { assignedTo } : {}),
       ...(setApartBy ? { setApartBy } : {}),
     }));
@@ -156,6 +200,15 @@ export class DemoCallingsService
     actor: AppUser,
     note?: string,
   ): Promise<void> {
+    if (
+      workflow.status === 'sustained' ||
+      workflow.status === 'set_apart' ||
+      workflow.status === 'recorded_in_lcr' ||
+      workflow.status === 'complete'
+    ) {
+      return;
+    }
+
     const previousStatus = getPreviousStatus(
       workflow.workflowType,
       workflow.status,
@@ -174,8 +227,6 @@ export class DemoCallingsService
       };
       if (dateField) delete next[dateField];
       if (workflow.status === 'interview_assigned') delete next.assignedTo;
-      if (workflow.status === 'set_apart') delete next.setApartBy;
-      if (workflow.status === 'complete') delete next.recordedDate;
       return next;
     });
 
@@ -188,6 +239,357 @@ export class DemoCallingsService
       note: note?.trim()
         ? `Rolled back by the stake presidency. ${note.trim()}`
         : 'Rolled back by the stake presidency.',
+    });
+  }
+
+  async markUnitSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      | 'id'
+      | 'workflowType'
+      | 'unit'
+      | 'sustainedInUnits'
+      | 'sustainedByPresidencyUnits'
+      | 'recordedDate'
+      | 'setApartDate'
+    >,
+    unitNumber: string,
+    actor: AppUser,
+  ): Promise<void> {
+    const now = Timestamp.now();
+    const wasStarted = (workflow.sustainedInUnits ?? []).length > 0;
+    const wasFullySustained = isFullySustained(workflow);
+    const nowFullySustained = isFullySustained({
+      ...workflow,
+      sustainedInUnits: [...(workflow.sustainedInUnits ?? []), unitNumber],
+    });
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: nowFullySustained,
+      recorded: !!workflow.recordedDate,
+      setApart: !!workflow.setApartDate,
+    });
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      sustainedInUnits: [...new Set([...(w.sustainedInUnits ?? []), unitNumber])],
+      sustainedByPresidencyUnits: (w.sustainedByPresidencyUnits ?? []).filter((u) => u !== unitNumber),
+      status,
+      ...(nowFullySustained && !wasFullySustained ? { sustainedDate: now } : {}),
+      ...(status === 'complete' ? { completedDate: now } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    if (!wasStarted || (nowFullySustained && !wasFullySustained)) {
+      const noteParts: string[] = [];
+      if (!wasStarted) noteParts.push('Sustaining begun.');
+      if (nowFullySustained && !wasFullySustained) noteParts.push('Sustained in every unit.');
+      if (status === 'complete') noteParts.push('This closes the workflow.');
+      this.appendHistory(workflow.id, {
+        id: `${workflow.id}-h${Date.now()}`,
+        status,
+        changedBy: actor.firebaseUid,
+        changedByName: actor.displayName,
+        changedAt: now,
+        note: noteParts.join(' '),
+      });
+    }
+  }
+
+  async unmarkUnitSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'recordedDate' | 'setApartDate'
+    >,
+    unitNumber: string,
+    actor: AppUser,
+  ): Promise<void> {
+    const now = Timestamp.now();
+    const remainingUnits = (workflow.sustainedInUnits ?? []).filter((u) => u !== unitNumber);
+    const status = this.statusAfterRemovingUnits(workflow, remainingUnits);
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      sustainedInUnits: (w.sustainedInUnits ?? []).filter((u) => u !== unitNumber),
+      sustainedByPresidencyUnits: (w.sustainedByPresidencyUnits ?? []).filter((u) => u !== unitNumber),
+      status,
+      ...(isFullySustained({ ...workflow, sustainedInUnits: remainingUnits })
+        ? {}
+        : { sustainedDate: undefined }),
+      ...(status === 'complete' ? {} : { completedDate: undefined }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+  }
+
+  async markAllUnitsSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'recordedDate' | 'setApartDate'
+    >,
+    actor: AppUser,
+  ): Promise<string[]> {
+    const done = new Set(workflow.sustainedInUnits ?? []);
+    const missing = requiredUnitsFor(workflow).filter((u) => !done.has(u));
+    if (missing.length === 0) return [];
+    const now = Timestamp.now();
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: true,
+      recorded: !!workflow.recordedDate,
+      setApart: !!workflow.setApartDate,
+    });
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      sustainedInUnits: [...new Set([...(w.sustainedInUnits ?? []), ...missing])],
+      sustainedByPresidencyUnits: [...new Set([...(w.sustainedByPresidencyUnits ?? []), ...missing])],
+      status,
+      sustainedDate: now,
+      ...(status === 'complete' ? { completedDate: now } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note:
+        `Marked sustained by the Stake Presidency: ${missing.map(unitLabel).join(', ')}.` +
+        (status === 'complete' ? ' This closes the workflow.' : ''),
+    });
+    return missing;
+  }
+
+  async undoMarkAllUnitsSustained(
+    workflow: Pick<
+      CallingWorkflow,
+      | 'id'
+      | 'workflowType'
+      | 'unit'
+      | 'sustainedInUnits'
+      | 'sustainedByPresidencyUnits'
+      | 'recordedDate'
+      | 'setApartDate'
+    >,
+    actor: AppUser,
+  ): Promise<void> {
+    const marked = workflow.sustainedByPresidencyUnits ?? [];
+    if (marked.length === 0) return;
+    const now = Timestamp.now();
+    const remainingUnits = (workflow.sustainedInUnits ?? []).filter((u) => !marked.includes(u));
+    const status = this.statusAfterRemovingUnits(workflow, remainingUnits);
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      sustainedInUnits: (w.sustainedInUnits ?? []).filter((u) => !marked.includes(u)),
+      sustainedByPresidencyUnits: (w.sustainedByPresidencyUnits ?? []).filter((u) => !marked.includes(u)),
+      status,
+      ...(isFullySustained({ ...workflow, sustainedInUnits: remainingUnits })
+        ? {}
+        : { sustainedDate: undefined }),
+      ...(status === 'complete' ? {} : { completedDate: undefined }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note: `Undid the Stake Presidency's sustaining mark for: ${marked.map(unitLabel).join(', ')}.`,
+    });
+  }
+
+  private statusAfterRemovingUnits(
+    workflow: Pick<CallingWorkflow, 'workflowType' | 'unit' | 'recordedDate' | 'setApartDate'>,
+    remainingUnits: string[],
+  ): CallingStatus | ReleaseStatus {
+    const nothingLeft = remainingUnits.length === 0 && !workflow.recordedDate && !workflow.setApartDate;
+    if (nothingLeft) return workflow.workflowType === 'release' ? 'released' : 'accepted';
+    return nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained({ ...workflow, sustainedInUnits: remainingUnits }),
+      recorded: !!workflow.recordedDate,
+      setApart: !!workflow.setApartDate,
+    });
+  }
+
+  async sustainAndSetApart(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'sustainedInUnits' | 'recordedDate'>,
+    unitNumber: string | undefined,
+    actor: AppUser,
+  ): Promise<void> {
+    const now = Timestamp.now();
+    const unitToAdd = unitNumber ?? workflow.unit;
+    const wasFullySustained = isFullySustained(workflow);
+    const updatedUnits = unitToAdd
+      ? [...(workflow.sustainedInUnits ?? []), unitToAdd]
+      : (workflow.sustainedInUnits ?? []);
+    const nowFullySustained = isFullySustained({ ...workflow, sustainedInUnits: updatedUnits });
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: nowFullySustained,
+      recorded: !!workflow.recordedDate,
+      setApart: true,
+    });
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      status,
+      setApartDate: now,
+      setApartBy: actor.displayName,
+      ...(unitToAdd ? { sustainedInUnits: [...new Set([...(w.sustainedInUnits ?? []), unitToAdd])] } : {}),
+      ...(nowFullySustained && !wasFullySustained ? { sustainedDate: now } : {}),
+      ...(status === 'complete' ? { completedDate: now } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note:
+        `Sustained and set apart by ${actor.displayName} in the same visit.` +
+        (status === 'complete' ? ' This closes the workflow.' : ''),
+    });
+  }
+
+  async logSetApart(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'recordedDate'>,
+    actor: AppUser,
+    setApartBy?: string,
+  ): Promise<void> {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const now = Timestamp.now();
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: !!workflow.recordedDate,
+      setApart: true,
+    });
+    const trimmedSetApartBy = setApartBy?.trim();
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      status,
+      setApartDate: now,
+      ...(trimmedSetApartBy ? { setApartBy: trimmedSetApartBy } : {}),
+      ...(status === 'complete' ? { completedDate: now } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    const noteParts = ['Set apart.'];
+    if (trimmedSetApartBy) noteParts.push(`Set apart by ${trimmedSetApartBy}.`);
+    if (status === 'complete') noteParts.push('This closes the workflow.');
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note: noteParts.join(' '),
+    });
+  }
+
+  async undoSetApart(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'recordedDate'>,
+    actor: AppUser,
+  ): Promise<void> {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const now = Timestamp.now();
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: !!workflow.recordedDate,
+      setApart: false,
+    });
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      status,
+      setApartDate: undefined,
+      setApartBy: undefined,
+      ...(status === 'complete' ? {} : { completedDate: undefined }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note: 'Setting apart undone.',
+    });
+  }
+
+  async recordInLcr(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'setApartDate'>,
+    actor: AppUser,
+  ): Promise<void> {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const now = Timestamp.now();
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: true,
+      setApart: !!workflow.setApartDate,
+    });
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      status,
+      recordedDate: now,
+      ...(status === 'complete' ? { completedDate: now } : {}),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    const noteParts = ['Recorded in LCR.'];
+    if (status === 'complete') noteParts.push('This closes the workflow.');
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note: noteParts.join(' '),
+    });
+  }
+
+  async undoRecordInLcr(
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'setApartDate'>,
+    actor: AppUser,
+  ): Promise<void> {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const now = Timestamp.now();
+    const status = nextStatus(workflow.workflowType, {
+      fullySustained: isFullySustained(workflow),
+      recorded: false,
+      setApart: !!workflow.setApartDate,
+    });
+
+    this.patch(workflow.id, (w) => ({
+      ...w,
+      status,
+      recordedDate: undefined,
+      ...(status === 'complete' ? {} : { completedDate: undefined }),
+      updatedBy: actor.firebaseUid,
+      updatedAt: now,
+    }));
+
+    this.appendHistory(workflow.id, {
+      id: `${workflow.id}-h${Date.now()}`,
+      status,
+      changedBy: actor.firebaseUid,
+      changedByName: actor.displayName,
+      changedAt: now,
+      note: 'LCR recording undone.',
     });
   }
 
