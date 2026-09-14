@@ -47,11 +47,15 @@ export function canRollbackStatus(user: AppUser | null): boolean {
  *   vote), and the sustaining/setting-apart/ordaining steps a councilor
  *   performs in person while visiting a unit on a Sunday -
  *   accepted/released -> sustained, accepted/released -> set_apart
- *   (sustained and set apart in the same visit), sustained -> set_apart
- *   (set apart on a later visit), and high_council_approved -> ordained
- *   (a priesthood advancement, performed the same way). See
- *   core/sunday-visit.ts for the presence rule that decides which of
- *   those a given workflow is eligible for.
+ *   (sustained and set apart in the same visit), sustained -> sustained
+ *   (recording one more unit's vote on a stake-wide calling that's
+ *   already partway through Finalizing - status doesn't change until
+ *   every unit has weighed in, see core/sunday-visit.ts's
+ *   isFullySustained), sustained -> set_apart (set apart on a later
+ *   visit), and high_council_approved -> ordained (a priesthood
+ *   advancement, performed the same way). See core/sunday-visit.ts for
+ *   the presence rule that decides which of those a given workflow is
+ *   eligible for.
  * The legality of `from -> to` itself is checked separately via
  * getNextStatuses(); this helper only enforces the ROLE-based scoping.
  */
@@ -66,7 +70,7 @@ export function canAdvanceStatus(
     if ((from === 'accepted' || from === 'released') && (to === 'sustained' || to === 'set_apart')) {
       return true;
     }
-    if (from === 'sustained' && to === 'set_apart') return true;
+    if (from === 'sustained' && (to === 'sustained' || to === 'set_apart')) return true;
     if (from === 'high_council_approved' && to === 'ordained') return true;
   }
   return false;

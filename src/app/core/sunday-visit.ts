@@ -30,8 +30,32 @@ export function requiredUnitsFor(workflow: Pick<CallingWorkflow, 'unit'>): reado
   return workflow.unit ? [workflow.unit] : stakeUnits().map((u) => u.number);
 }
 
-/** True once every required unit has sustained - see requiredUnitsFor. */
-export function isFullySustained(workflow: Pick<CallingWorkflow, 'unit' | 'sustainedInUnits'>): boolean {
+/**
+ * True once every required unit has sustained - see requiredUnitsFor.
+ *
+ * A ward/branch workflow (has its own `unit`) that has already reached
+ * `sustained` or a later status is treated as fully sustained even if
+ * `sustainedInUnits` doesn't list its unit: `sustainedInUnits` wasn't
+ * tracked for ward/branch workflows before Finalizing was added, so a
+ * workflow that reached `sustained` under the old single-step model (that
+ * transition WAS its one required unit's vote) has nothing to backfill.
+ * New ward/branch writes populate `sustainedInUnits` too (see
+ * CallingsService.advanceStatus's `sustainsOwnUnit`), so this fallback
+ * only matters for that pre-existing data - it never overrides a real
+ * `false` for a stake-wide workflow, which has no such status shortcut.
+ */
+export function isFullySustained(
+  workflow: Pick<CallingWorkflow, 'unit' | 'sustainedInUnits'> & { status?: string },
+): boolean {
+  if (
+    workflow.unit &&
+    (workflow.status === 'sustained' ||
+      workflow.status === 'set_apart' ||
+      workflow.status === 'recorded_in_lcr' ||
+      workflow.status === 'complete')
+  ) {
+    return true;
+  }
   const done = new Set(workflow.sustainedInUnits ?? []);
   return requiredUnitsFor(workflow).every((u) => done.has(u));
 }

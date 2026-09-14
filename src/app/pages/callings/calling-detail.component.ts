@@ -405,7 +405,7 @@ function displayStatusLabel(w: CallingWorkflow): string {
         }
 
         @for (s of nextStatuses(); track s) {
-          @if (s !== 'set_apart' && s !== 'recorded_in_lcr' && s !== 'complete') {
+          @if (s !== 'set_apart' && s !== 'recorded_in_lcr' && s !== 'complete' && !(s === 'sustained' && !w.unit)) {
           @if (canAdvance(w.status, s) && advanceButtonEnabled(w, s)) {
             <div class="card stack">
               <strong>Advance status</strong>
@@ -863,15 +863,14 @@ export class CallingDetailComponent {
   /**
    * HC's advance to high_council_approved needs quorum AND no concern
    * still outstanding - the same condition firestore.rules enforces. A
-   * stake-wide workflow's advance to `sustained` needs every unit
-   * checked off. Presidency can bypass both - on the record, see the
-   * note advance() attaches when it does. All other transitions aren't
-   * gated here (the role check handles them).
+   * stake-wide workflow's advance to `sustained` is handled entirely by
+   * the dedicated checklist card above (showSustainingChecklist) instead
+   * of this generic button - see the template's `!(s === 'sustained' &&
+   * !w.unit)` filter - since only that path keeps `sustainedInUnits` in
+   * sync with `status`. All other transitions aren't gated here (the
+   * role check handles them).
    */
   advanceButtonEnabled(w: CallingWorkflow, to: string): boolean {
-    if (to === 'sustained' && !w.unit) {
-      return this.sustainingComplete() || isPresidency(this.authService.appUser());
-    }
     if (isPresidency(this.authService.appUser())) return true;
     if (w.status === 'presidency_approved' && to === 'high_council_approved') {
       return this.hc().clearToAdvance;
@@ -943,15 +942,7 @@ export class CallingDetailComponent {
             ? actor.displayName
             : this.pendingSetApartBy().trim()
           : undefined;
-      // Presidency bypassing the "every unit" sustaining checklist - flag
-      // it plainly in the audit trail rather than letting it read like an
-      // ordinary sustaining.
-      const note =
-        status === 'sustained' && !w.unit && !this.sustainingComplete()
-          ? `Sustained by the stake presidency; only ${this.sustainedUnitCount()} of ` +
-            `${this.stakeUnitsList.length} units had confirmed.`
-          : undefined;
-      await this.callingsService.advanceStatus(w, status, actor, { assignedTo, setApartBy, note });
+      await this.callingsService.advanceStatus(w, status, actor, { assignedTo, setApartBy });
       this.pendingAssignee.set('');
       this.pendingSetApartBy.set('');
     } finally {

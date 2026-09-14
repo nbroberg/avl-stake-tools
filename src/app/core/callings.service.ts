@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { Observable } from 'rxjs';
 import { db } from './firebase';
-import { DATE_FIELD_BY_STATUS, getPreviousStatus } from './calling-status';
+import { DATE_FIELD_BY_STATUS, getPreviousStatus, hasEnteredFinalizing, nextStatus } from './calling-status';
 import { HC_QUORUM_REQUIRED } from './quorum';
 import { RosterSyncService } from './roster-sync.service';
 import { isFullySustained, requiredUnitsFor } from './sunday-visit';
@@ -63,13 +63,6 @@ export interface AdvanceStatusOptions {
   setApartBy?: string;
   /** Optional per-transition note appended to the audit history. */
   note?: string;
-}
-
-/** The three independent Finalizing facts recomputeStatus derives `status` from. */
-interface FinalizingFacts {
-  fullySustained: boolean;
-  recorded: boolean;
-  setApart: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -145,46 +138,6 @@ export class CallingsService {
     } satisfies WithFieldValue<Omit<CallingStatusHistoryEntry, 'id'>>);
 
     return docRef.id;
-  }
-
-  /**
-   * `status` beyond `sustained` is a *derivation* of three independent
-   * facts (fully sustained, recorded in LCR, set apart), not something
-   * any caller decides directly - see markUnitSustained,
-   * markAllUnitsSustained, logSetApart and recordInLcr below, all of
-   * which end by calling this. `complete` requires all three (a release
-   * has no set-apart leg, so it only needs the other two); short of
-   * that, `status` rests at whichever of `recorded_in_lcr`/`set_apart`
-   * reflects what's true - or `sustained` if nothing beyond sustaining
-   * has happened yet, or sustaining itself isn't yet full. This keeps
-   * every existing status literal in the same order they already have
-   * (proposed..accepted/released, sustained, set_apart, recorded_in_lcr,
-   * complete) - nothing new is introduced - it's just no longer *this
-   * method's caller's job* to decide which of the last few to land on.
-   */
-  private nextStatus(
-    workflowType: CallingWorkflowType,
-    facts: FinalizingFacts,
-  ): CallingStatus | ReleaseStatus {
-    if (!facts.fullySustained) return 'sustained';
-    const closed = facts.recorded && (workflowType === 'release' || facts.setApart);
-    if (closed) return 'complete';
-    if (facts.recorded) return 'recorded_in_lcr';
-    if (facts.setApart) return 'set_apart';
-    return 'sustained';
-  }
-
-  /**
-   * Whether Finalizing has begun - guards logSetApart/undoSetApart and
-   * recordInLcr/undoRecordInLcr, which only make sense once at least one
-   * unit has sustained the workflow (spec: setting apart "can be logged
-   * any time once the calling is in Finalizing"; the LCR Recording page
-   * only lists callings at least one unit has sustained). Calling one of
-   * those before then would otherwise compute `nextStatus` against an
-   * empty sustaining checklist and wrongly land on `sustained`.
-   */
-  private hasEnteredFinalizing(status: string): boolean {
-    return status === 'sustained' || status === 'set_apart' || status === 'recorded_in_lcr';
   }
 
   async advanceStatus(
@@ -325,7 +278,7 @@ export class CallingsService {
       ...workflow,
       sustainedInUnits: [...(workflow.sustainedInUnits ?? []), unitNumber],
     });
-    const status = this.nextStatus(workflow.workflowType, {
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: nowFullySustained,
       recorded: !!workflow.recordedDate,
       setApart: !!workflow.setApartDate,
@@ -412,7 +365,7 @@ export class CallingsService {
     if (missing.length === 0) return [];
 
     // Adding every missing unit necessarily completes the sustaining.
-    const status = this.nextStatus(workflow.workflowType, {
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: true,
       recorded: !!workflow.recordedDate,
       setApart: !!workflow.setApartDate,
@@ -504,7 +457,7 @@ export class CallingsService {
     if (nothingLeft) {
       return workflow.workflowType === 'release' ? 'released' : 'accepted';
     }
-    return this.nextStatus(workflow.workflowType, {
+    return nextStatus(workflow.workflowType, {
       fullySustained: isFullySustained({ ...workflow, sustainedInUnits: remainingUnits }),
       recorded: !!workflow.recordedDate,
       setApart: !!workflow.setApartDate,
@@ -532,7 +485,7 @@ export class CallingsService {
       ? [...(workflow.sustainedInUnits ?? []), unitToAdd]
       : (workflow.sustainedInUnits ?? []);
     const nowFullySustained = isFullySustained({ ...workflow, sustainedInUnits: updatedUnits });
-    const status = this.nextStatus(workflow.workflowType, {
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: nowFullySustained,
       recorded: !!workflow.recordedDate,
       setApart: true,
@@ -572,8 +525,8 @@ export class CallingsService {
     actor: AppUser,
     setApartBy?: string,
   ): Promise<void> {
-    if (!this.hasEnteredFinalizing(workflow.status)) return;
-    const status = this.nextStatus(workflow.workflowType, {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: isFullySustained(workflow),
       recorded: !!workflow.recordedDate,
       setApart: true,
@@ -606,8 +559,8 @@ export class CallingsService {
     workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'recordedDate'>,
     actor: AppUser,
   ): Promise<void> {
-    if (!this.hasEnteredFinalizing(workflow.status)) return;
-    const status = this.nextStatus(workflow.workflowType, {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: isFullySustained(workflow),
       recorded: !!workflow.recordedDate,
       setApart: false,
@@ -644,8 +597,8 @@ export class CallingsService {
     workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'setApartDate'>,
     actor: AppUser,
   ): Promise<void> {
-    if (!this.hasEnteredFinalizing(workflow.status)) return;
-    const status = this.nextStatus(workflow.workflowType, {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: isFullySustained(workflow),
       recorded: true,
       setApart: !!workflow.setApartDate,
@@ -678,8 +631,8 @@ export class CallingsService {
     workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit' | 'status' | 'sustainedInUnits' | 'setApartDate'>,
     actor: AppUser,
   ): Promise<void> {
-    if (!this.hasEnteredFinalizing(workflow.status)) return;
-    const status = this.nextStatus(workflow.workflowType, {
+    if (!hasEnteredFinalizing(workflow.status)) return;
+    const status = nextStatus(workflow.workflowType, {
       fullySustained: isFullySustained(workflow),
       recorded: false,
       setApart: !!workflow.setApartDate,

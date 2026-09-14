@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 /**
@@ -234,6 +234,80 @@ describe('callingWorkflows - Finalizing stage', () => {
         status: 'set_apart',
         setApartDate: new Date(),
         setApartBy: 'Someone Else',
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('lets a high councilor log an early set-apart while status stays sustained (not fully sustained yet)', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-finalizing'), {
+        status: 'sustained',
+        setApartDate: new Date(),
+        setApartBy: 'Councilor',
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+});
+
+describe('callingWorkflows - undoing an early set-apart', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'callingWorkflows', 'wf-early-set-apart'), {
+        workflowType: 'calling',
+        status: 'sustained',
+        sustainedInUnits: ['900101'],
+        setApartDate: new Date(),
+        setApartBy: 'Councilor',
+      });
+    });
+  });
+
+  it('lets a high councilor undo an early set-apart while status stays sustained', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-early-set-apart'), {
+        status: 'sustained',
+        setApartDate: deleteField(),
+        setApartBy: deleteField(),
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does not let a high councilor sneak a new set-apart name in through the undo path', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-early-set-apart'), {
+        status: 'sustained',
+        setApartBy: 'Someone Else',
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does not let a high councilor undo a set-apart that already advanced status - presidency only', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'callingWorkflows', 'wf-fully-set-apart'), {
+        workflowType: 'calling',
+        status: 'set_apart',
+        sustainedInUnits: ['900101'],
+        setApartDate: new Date(),
+        setApartBy: 'Councilor',
+      });
+    });
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-fully-set-apart'), {
+        status: 'sustained',
+        setApartDate: deleteField(),
+        setApartBy: deleteField(),
         updatedAt: new Date(),
         updatedBy: COUNCILOR_UID,
       }),

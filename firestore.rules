@@ -128,14 +128,16 @@ service cloud.firestore {
       // concern); advance the status once quorum is met with no concern
       // outstanding; and, while physically visiting a unit on a Sunday,
       // mark a unit sustained, sustain (optionally combined with setting
-      // apart in the same visit), or set apart on its own.
+      // apart in the same visit), set apart on its own, or undo an early
+      // set-apart log.
       allow update: if isPresidency()
         || (isHighCouncil()
             && (isHighCouncilSelfVote()
                 || isHighCouncilQuorumAdvance()
                 || isHighCouncilMarkSustainedUnit()
                 || isHighCouncilSustain()
-                || isHighCouncilSetApart()));
+                || isHighCouncilSetApart()
+                || isHighCouncilUndoSetApart()));
 
       match /history/{entryId} {
         allow read: if isAnyApprovedUser();
@@ -284,6 +286,31 @@ service cloud.firestore {
         && request.resource.data.get('setApartBy', '') == callerDoc().data.displayName
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'setApartDate', 'setApartBy', 'completedDate', 'updatedAt', 'updatedBy']);
+    }
+
+    /**
+     * A high councilor undoing an early set-apart log - the mirror of
+     * isHighCouncilSetApart for CallingsService.undoSetApart. Needed
+     * because undoing doesn't change whether sustaining is full or LCR is
+     * recorded, so `status` stays exactly where it already was (typically
+     * `sustained`, still not fully sustained - the ordinary case a
+     * councilor undoes a mis-click or a too-early log from; defensively
+     * also `recorded_in_lcr`, matching core/roles.ts's canUndoSetApart
+     * window) rather than moving the way isHighCouncilSetApart's own
+     * advancing writes do. Unlike isHighCouncilSetApart there's no name to
+     * check: setApartDate/setApartBy are only ever removed here, never set
+     * to any value (the `!(... in request.resource.data)` checks enforce
+     * that - not merely changed but genuinely absent afterward), so any
+     * high councilor eligible in this window may undo whoever logged it.
+     */
+    function isHighCouncilUndoSetApart() {
+      return isHighCouncil()
+        && (resource.data.status == 'sustained' || resource.data.status == 'recorded_in_lcr')
+        && request.resource.data.status == resource.data.status
+        && !('setApartDate' in request.resource.data)
+        && !('setApartBy' in request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'setApartDate', 'setApartBy', 'updatedAt', 'updatedBy']);
     }
 
     // ---------------------------------------------------------------------

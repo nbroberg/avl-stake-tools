@@ -6,7 +6,7 @@ import type {
   CallingsService,
   NewCallingWorkflowInput,
 } from '../callings.service';
-import { DATE_FIELD_BY_STATUS, getPreviousStatus } from '../calling-status';
+import { DATE_FIELD_BY_STATUS, getPreviousStatus, hasEnteredFinalizing, nextStatus } from '../calling-status';
 import { HC_QUORUM_REQUIRED } from '../quorum';
 import { isFullySustained, requiredUnitsFor } from '../sunday-visit';
 import { unitLabel } from '../units';
@@ -15,44 +15,17 @@ import type {
   CallingStatus,
   CallingStatusHistoryEntry,
   CallingWorkflow,
-  CallingWorkflowType,
   HistoryEntryKind,
   ReleaseStatus,
 } from '../../models/types';
 import { demoHistory, demoWorkflows } from './demo-data';
-
-/** The three independent Finalizing facts nextStatus derives `status` from -
- *  mirrors CallingsService's private FinalizingFacts/nextStatus/
- *  hasEnteredFinalizing exactly, so demo mode exercises the same status
- *  transitions a real Firestore-backed session would. */
-interface FinalizingFacts {
-  fullySustained: boolean;
-  recorded: boolean;
-  setApart: boolean;
-}
-
-function nextStatus(
-  workflowType: CallingWorkflowType,
-  facts: FinalizingFacts,
-): CallingStatus | ReleaseStatus {
-  if (!facts.fullySustained) return 'sustained';
-  const closed = facts.recorded && (workflowType === 'release' || facts.setApart);
-  if (closed) return 'complete';
-  if (facts.recorded) return 'recorded_in_lcr';
-  if (facts.setApart) return 'set_apart';
-  return 'sustained';
-}
-
-function hasEnteredFinalizing(status: string): boolean {
-  return status === 'sustained' || status === 'set_apart' || status === 'recorded_in_lcr';
-}
 
 /**
  * In-memory stand-in for CallingsService. Mutations mirror the real
  * service's semantics - same status/date fields, same audit-history
  * entries, same arrayUnion-style de-duplication on high council votes -
  * so advancing a workflow in demo mode exercises the same UI branches
- * a real one would.State lives for the life of the page.
+ * a real one would. State lives for the life of the page.
  */
 @Injectable()
 export class DemoCallingsService
