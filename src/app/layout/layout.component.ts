@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth.service';
+import { isPresidency } from '../core/roles';
 import { ROLE_LABELS } from '../models/types';
 
 /** Types that bring up the iOS text keyboard - not checkbox/radio/etc. */
@@ -38,6 +39,9 @@ const TEXT_INPUT_TYPES = new Set([
         <a routerLink="/units" routerLinkActive="active">Units</a>
         <a routerLink="/assignments" routerLinkActive="active">Assignments</a>
         <a routerLink="/callings" routerLinkActive="active">Callings</a>
+        @if (isPresidency(authService.appUser())) {
+          <a routerLink="/lcr-recording" routerLinkActive="active">LCR Recording</a>
+        }
         <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
         <a routerLink="/help" routerLinkActive="active">Help</a>
       </nav>
@@ -52,6 +56,7 @@ const TEXT_INPUT_TYPES = new Set([
 export class LayoutComponent {
   protected readonly authService = inject(AuthService);
   protected readonly roleLabels = ROLE_LABELS;
+  protected readonly isPresidency = isPresidency;
 
   /**
    * Whether a text field is focused, so the fixed bottom nav can hide

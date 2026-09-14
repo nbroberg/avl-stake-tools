@@ -99,45 +99,71 @@ Interview / Calling Extended
    ↓
 Accepted
    ↓
-Sustained
+Sustained  ─┬─ Finalizing: entered the moment ONE unit sustains it (not
+   ↓        │  every unit - see "Finalizing" below). From here,
+Set Apart   │  sustaining, LCR recording, and setting apart are tracked
+   ↓        │  independently and can happen in any order; `status` just
+Recorded    │  rests at whichever of Sustained/Set Apart/Recorded in
+in LCR     ─┘  LCR best reflects what's true so far.
    ↓
-Set Apart
-   ↓
-Recorded in LCR
-   ↓
-Complete
+Complete       ← reached automatically once fully sustained, recorded,
+                 and set apart - never a direct write.
 ```
 
-**Release (7 states):**
+**Release (7 states):** same idea, minus the set-apart leg.
 
 ```
 Proposed → Stake Presidency Approved → Release Extended → Released →
-Sustained → Recorded in LCR → Complete
+Sustained/Recorded in LCR (Finalizing) → Complete
 ```
 
 Every transition writes an entry to the workflow's `history/`
 subcollection (append-only, no updates or deletes) with the actor's UID,
 display name, and any note (e.g. the interview assignee's name).
 
-**Sustaining across the stake is presidency-overridable.** A stake-wide
-calling/release normally can't reach `Sustained` until every unit has
-signed off (see `core/sunday-visit.ts`'s `completesSustaining`), but the
-presidency can advance it anyway - Firestore rules already give them
-unconditional write access here. Doing so writes an explicit audit note
-recording how many units had actually confirmed at the time.
+**Finalizing tracks three independent facts, not three sequential
+steps.** `status` still only ever holds one of the existing literals
+above - there's deliberately no combined "sustained and recorded" value
+- but which literal it rests at is *derived* from three facts that can
+each become true in any order once Finalizing has begun (see
+`CallingsService`'s private `nextStatus`/`hasEnteredFinalizing`):
+whether every required unit has sustained it (`sustainedInUnits` vs.
+`core/sunday-visit.ts`'s `requiredUnitsFor`), whether it's been recorded
+in LCR (`recordedDate`), and - for a calling, not a release - whether
+it's been set apart (`setApartDate`). `status` is `recorded_in_lcr`
+exactly when it's fully sustained and recorded but not yet set apart;
+the UI shows that combination as "Awaiting setting apart" rather than
+the literal label. `complete` is reached automatically, in the same
+write as whichever of the three facts completes it, never by a direct
+"mark complete" action.
 
-**Recording in LCR finalizes the workflow.** Marking `Recorded in LCR`
-writes straight through to `Complete` in the same update (both dates get
-stamped) rather than waiting on a separate click - there's nothing left
-to do once it's recorded. It also flips `rosterSync/status` to
-`pending: true`, which shows the presidency a "Roster sync required"
-banner on the dashboard, since the `people` collection has no live LCR
-connection and may now be behind. A completed roster import clears the
-flag automatically - both the in-app paste importer
-(`pages/people/roster-import.component.ts`) and the `lcr-client` CLI
-(a separate, sibling repo - not part of this checkout) do this on a
-successful write - since an import actually catching
-the roster up is a real, observable event, unlike an LCR-side change
+**Sustaining across the stake is presidency-overridable**, same as
+before, two ways: the presidency can mark any individual unit sustained
+without waiting for the others (`CallingsService.markUnitSustained`),
+or bulk-mark every outstanding required unit at once
+(`markAllUnitsSustained`, undoable via `undoMarkAllUnitsSustained`) -
+units added by the bulk action are flagged in
+`sustainedByPresidencyUnits` so they're distinguishable in the UI and
+the undo only removes what that action added, not anything a unit
+separately self-reported.
+
+**Recording in LCR no longer finalizes the workflow by itself.**
+`CallingsService.recordInLcr`/`undoRecordInLcr` only stamp/clear
+`recordedDate` (Stake Presidency only - see the **LCR Recording** page,
+which lists every calling/release at least one unit has sustained but
+LCR hasn't recorded yet) and let `nextStatus` recompute `status` -
+`complete` only follows if sustaining and (for a calling) setting apart
+were already done too. Recording still flips `rosterSync/status` to
+`pending: true`, the same trigger point as before, just moved to fire
+at the moment of recording rather than at the moment of closing (they
+used to always coincide; now they usually don't) - it shows the
+presidency a "Roster sync required" banner on the dashboard, since the
+`people` collection has no live LCR connection and may now be behind. A
+completed roster import clears the flag automatically - both the in-app
+paste importer (`pages/people/roster-import.component.ts`) and the
+`lcr-client` CLI (a separate, sibling repo - not part of this checkout)
+do this on a successful write - since an import actually catching the
+roster up is a real, observable event, unlike an LCR-side change
 happening at all. The dashboard also has a manual "Mark roster synced"
 button as a fallback for anything outside those two paths.
 
@@ -347,7 +373,8 @@ firebase emulators:start --only auth,firestore
 ```
 
 Java is required for the Firestore emulator. On macOS,
-`brew install openjdk` and put it on PATH.
+`brew install --cask zulu@21` (Azul's OpenJDK build — avoids Oracle's
+JDK licensing terms).
 
 ### 4b. Demo mode (mock data, no Firebase)
 
@@ -475,7 +502,12 @@ deploying to a user/org root page or a custom domain, edit the
 5. **Firestore authenticated write works** — same diagnostics page.
 6. **Firestore rules correctly reject unauthorized users** — before
    your account has a role, reading `callingWorkflows` should fail with
-   `permission-denied`.
+   `permission-denied`. This boundary is also checked automatically by
+   `npm run test:rules` (see [firestore.rules.test.ts](tests/firestore.rules.test.ts)),
+   which runs in CI on every push and fails the build if a rule change
+   ever widens who can read PII. Requires a local JDK for the Firestore
+   emulator (`brew install --cask zulu@21`); not needed for the plain
+   `npm test`.
 
 `/diagnostics` has no auth guard on its route, specifically so it's
 useful for exactly this kind of incremental, from-the-meetinghouse-

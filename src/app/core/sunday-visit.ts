@@ -1,4 +1,3 @@
-import { getNextStatuses as getNextCallingStatuses } from './calling-status';
 import { getNextStatuses as getNextAdvancementStatuses } from './advancement-status';
 import { stakeUnits, type StakeUnit } from './units';
 import type { CallingWorkflow, Person, PriesthoodAdvancementWorkflow } from '../models/types';
@@ -21,17 +20,74 @@ export function isPersonPresentInUnit(
   return person?.unit === unitNumber;
 }
 
-/** True for a workflow currently one step away from being sustained. */
-export function needsSustaining(workflow: CallingWorkflow): boolean {
-  return getNextCallingStatuses(workflow.workflowType, workflow.status, workflow.callingName).includes(
-    'sustained',
-  );
+/**
+ * Every unit number this workflow needs a sustaining vote from - its own
+ * unit for a ward/branch workflow, every stake unit for a stake-wide one.
+ * Shared by needsSustainingIn/completesSustaining below and by
+ * CallingsService.markAllUnitsSustained.
+ */
+export function requiredUnitsFor(workflow: Pick<CallingWorkflow, 'unit'>): readonly string[] {
+  return workflow.unit ? [workflow.unit] : stakeUnits().map((u) => u.number);
 }
 
-/** True for a workflow currently one step away from being set apart. */
+/**
+ * True once every required unit has sustained - see requiredUnitsFor.
+ *
+ * A ward/branch workflow (has its own `unit`) that has already reached
+ * `sustained` or a later status is treated as fully sustained even if
+ * `sustainedInUnits` doesn't list its unit: `sustainedInUnits` wasn't
+ * tracked for ward/branch workflows before Finalizing was added, so a
+ * workflow that reached `sustained` under the old single-step model (that
+ * transition WAS its one required unit's vote) has nothing to backfill.
+ * New ward/branch writes populate `sustainedInUnits` too (see
+ * CallingsService.advanceStatus's `sustainsOwnUnit`), so this fallback
+ * only matters for that pre-existing data - it never overrides a real
+ * `false` for a stake-wide workflow, which has no such status shortcut.
+ */
+export function isFullySustained(
+  workflow: Pick<CallingWorkflow, 'unit' | 'sustainedInUnits'> & { status?: string },
+): boolean {
+  if (
+    workflow.unit &&
+    (workflow.status === 'sustained' ||
+      workflow.status === 'set_apart' ||
+      workflow.status === 'recorded_in_lcr' ||
+      workflow.status === 'complete')
+  ) {
+    return true;
+  }
+  const done = new Set(workflow.sustainedInUnits ?? []);
+  return requiredUnitsFor(workflow).every((u) => done.has(u));
+}
+
+/**
+ * True while a workflow still needs at least one more unit's sustaining
+ * vote - drives the Units page's "Needs sustaining" list. `status` being
+ * `accepted`/`released` means no unit has sustained it yet; `sustained`
+ * now covers the whole Finalizing window from the first unit's vote
+ * onward (see calling-status.ts), so this also has to check
+ * `isFullySustained` directly rather than relying on `status` alone -
+ * a stake-wide workflow can sit at `sustained` for a long time while
+ * only some units have reported.
+ */
+export function needsSustaining(workflow: CallingWorkflow): boolean {
+  if (workflow.status === 'accepted' || workflow.status === 'released') return true;
+  if (workflow.status !== 'sustained') return false;
+  return !isFullySustained(workflow);
+}
+
+/**
+ * True for a workflow currently in Finalizing (or, for a stake-wide one,
+ * still sustaining) that hasn't been set apart yet. Deliberately not
+ * gated on full sustaining or on LCR recording - either can happen in
+ * either order once Finalizing has begun (`status` is `sustained` or
+ * `recorded_in_lcr`; `set_apart`/`complete` already mean it happened).
+ */
 export function needsSetApart(workflow: CallingWorkflow): boolean {
-  return getNextCallingStatuses(workflow.workflowType, workflow.status, workflow.callingName).includes(
-    'set_apart',
+  return (
+    workflow.workflowType === 'calling' &&
+    (workflow.status === 'sustained' || workflow.status === 'recorded_in_lcr') &&
+    !workflow.setApartDate
   );
 }
 
@@ -65,18 +121,18 @@ export function completesSustaining(
   unitNumber: string,
 ): boolean {
   if (workflow.unit) return true;
-  const done = new Set([...(workflow.sustainedInUnits ?? []), unitNumber]);
-  return stakeUnits().every((u) => done.has(u.number));
+  return isFullySustained({ ...workflow, sustainedInUnits: [...(workflow.sustainedInUnits ?? []), unitNumber] });
 }
 
 /**
  * Whether sustaining and setting apart can be folded into one action for
- * this workflow during a visit to `unitNumber` - only when that visit
- * both finishes the sustaining (nothing left to wait on from another
- * unit) and puts the visitor in the same room as the person being set
- * apart. A stake-wide calling that still needs other units, or one whose
- * person lives elsewhere, still gets sustained here - just not combined.
- * Releases never combine - there's no set-apart phase to fold into their
+ * this workflow during a visit to `unitNumber` - whenever that visit
+ * puts the visitor in the same room as the person being set apart.
+ * Setting apart no longer has to wait for every stake unit to have
+ * sustained the calling first - it can happen any time once Finalizing
+ * has begun (see needsSetApart), so this doesn't require `unitNumber` to
+ * be the *completing* unit anymore, just the person's own unit. Releases
+ * never combine - there's no set-apart phase to fold into their
  * sustaining (their `sustained` status is a vote of thanks, not a calling
  * to finish extending), so this is false for them regardless of unit.
  */
@@ -85,11 +141,7 @@ export function canCombineSustainAndSetApart(
   person: Pick<Person, 'unit'> | null,
   unitNumber: string,
 ): boolean {
-  return (
-    workflow.workflowType === 'calling' &&
-    completesSustaining(workflow, unitNumber) &&
-    isPersonPresentInUnit(workflow, person, unitNumber)
-  );
+  return workflow.workflowType === 'calling' && isPersonPresentInUnit(workflow, person, unitNumber);
 }
 
 export interface UnitOutstanding {

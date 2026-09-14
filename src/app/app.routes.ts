@@ -13,6 +13,7 @@ import { AdvancementsListComponent } from './pages/advancements/advancements-lis
 import { NewAdvancementComponent } from './pages/advancements/new-advancement.component';
 import { AdvancementDetailComponent } from './pages/advancements/advancement-detail.component';
 import { UnitsComponent } from './pages/units.component';
+import { LcrRecordingComponent } from './pages/lcr-recording.component';
 import { HelpComponent } from './pages/help.component';
 
 export const routes: Routes = [
@@ -33,6 +34,7 @@ export const routes: Routes = [
       { path: 'callings/new', component: NewCallingComponent },
       { path: 'callings/:id', component: CallingDetailComponent },
       { path: 'units', component: UnitsComponent },
+      { path: 'lcr-recording', component: LcrRecordingComponent },
       { path: 'advancements', component: AdvancementsListComponent },
       { path: 'advancements/new', component: NewAdvancementComponent },
       { path: 'advancements/:id', component: AdvancementDetailComponent },

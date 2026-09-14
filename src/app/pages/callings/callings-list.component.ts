@@ -25,7 +25,14 @@ import {
   type CallingWorkflow,
 } from '../../models/types';
 
+/**
+ * Same label CALLING_STATUS_LABELS/RELEASE_STATUS_LABELS would give,
+ * except `recorded_in_lcr` reads as "Awaiting setting apart" - see
+ * calling-detail.component.ts's displayStatusLabel for why that literal
+ * always means fully sustained + recorded + not yet set apart.
+ */
 function labelFor(w: CallingWorkflow): string {
+  if (w.status === 'recorded_in_lcr') return 'Awaiting setting apart';
   const labels = w.workflowType === 'release' ? RELEASE_STATUS_LABELS : CALLING_STATUS_LABELS;
   return (labels as Record<string, string>)[w.status] ?? w.status;
 }

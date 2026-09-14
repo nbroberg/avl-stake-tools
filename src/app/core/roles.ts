@@ -1,4 +1,4 @@
-import type { AppUser, Role } from '../models/types';
+import type { AppUser, CallingWorkflow, Role } from '../models/types';
 
 /**
  * UX-only role helpers. Firestore Security Rules (see firestore.rules) are
@@ -47,11 +47,15 @@ export function canRollbackStatus(user: AppUser | null): boolean {
  *   vote), and the sustaining/setting-apart/ordaining steps a councilor
  *   performs in person while visiting a unit on a Sunday -
  *   accepted/released -> sustained, accepted/released -> set_apart
- *   (sustained and set apart in the same visit), sustained -> set_apart
- *   (set apart on a later visit), and high_council_approved -> ordained
- *   (a priesthood advancement, performed the same way). See
- *   core/sunday-visit.ts for the presence rule that decides which of
- *   those a given workflow is eligible for.
+ *   (sustained and set apart in the same visit), sustained -> sustained
+ *   (recording one more unit's vote on a stake-wide calling that's
+ *   already partway through Finalizing - status doesn't change until
+ *   every unit has weighed in, see core/sunday-visit.ts's
+ *   isFullySustained), sustained -> set_apart (set apart on a later
+ *   visit), and high_council_approved -> ordained (a priesthood
+ *   advancement, performed the same way). See core/sunday-visit.ts for
+ *   the presence rule that decides which of those a given workflow is
+ *   eligible for.
  * The legality of `from -> to` itself is checked separately via
  * getNextStatuses(); this helper only enforces the ROLE-based scoping.
  */
@@ -66,8 +70,36 @@ export function canAdvanceStatus(
     if ((from === 'accepted' || from === 'released') && (to === 'sustained' || to === 'set_apart')) {
       return true;
     }
-    if (from === 'sustained' && to === 'set_apart') return true;
+    if (from === 'sustained' && (to === 'sustained' || to === 'set_apart')) return true;
     if (from === 'high_council_approved' && to === 'ordained') return true;
   }
   return false;
 }
+
+/** Only the presidency can bulk-mark every outstanding unit sustained. */
+export function canMarkAllUnitsSustained(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
+
+/**
+ * Whether the caller may log (or undo) that a calling was set apart.
+ * Presidency always; a High Councilor only once Finalizing has begun -
+ * `status` is `sustained` (sustaining under way, possibly not full yet)
+ * or `recorded_in_lcr` (already recorded, awaiting this) - matching the
+ * same window core/sunday-visit.ts's needsSetApart offers it in.
+ */
+export function canLogSetApart(user: AppUser | null, workflow: Pick<CallingWorkflow, 'status'>): boolean {
+  if (isPresidency(user)) return true;
+  return isHighCouncil(user) && (workflow.status === 'sustained' || workflow.status === 'recorded_in_lcr');
+}
+
+/** Alias for canLogSetApart - undoing a set-apart log uses the same eligibility. */
+export const canUndoSetApart = canLogSetApart;
+
+/** Only the presidency can mark (or undo marking) a calling recorded in LCR. */
+export function canRecordInLcr(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
+
+/** Alias for canRecordInLcr - undoing a recorded mark uses the same eligibility. */
+export const canUndoRecordInLcr = canRecordInLcr;
