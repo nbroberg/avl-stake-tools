@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { environment } from '../../environments/environment';
+import { demoMode } from './demo/demo-mode';
 
 // Standard Firebase Web SDK config. These values identify the Firebase
 // project to the browser and are not privileged secrets - see .env.example
@@ -25,7 +26,24 @@ export const firebaseConfigIsPresent = Boolean(
 // key. A "demo-" project id disables the emulators' production-safety
 // checks, so no real project needs to exist.
 const useEmulators = isDevMode() && !firebaseConfigIsPresent;
-if (useEmulators) {
+
+// Same problem, different cause: a demo build ships NO Firebase config at
+// all (scripts/generate-environment.mjs blanks it deliberately) and is not
+// a dev build, so the emulator fallback above doesn't catch it. This
+// module still gets evaluated there - AuthService is a DI token in the
+// initial bundle, so firebase.ts is always eagerly imported even though
+// demo mode replaces every service that would actually call Firebase -
+// and initializeApp() throws auth/invalid-api-key on an empty key,
+// killing bootstrap before anything renders.
+//
+// So hand it syntactically valid placeholders. Nothing ever uses them:
+// demo mode has already swapped AuthService, PeopleService,
+// CallingsService and PriesthoodAdvancementsService for in-memory
+// stand-ins, and no emulator is connected here (there isn't one on a
+// deployed site).
+const useDemoPlaceholders = !useEmulators && demoMode && !firebaseConfigIsPresent;
+
+if (useEmulators || useDemoPlaceholders) {
   firebaseConfig.apiKey = 'demo-api-key';
   firebaseConfig.projectId = 'demo-avl-stake-tools';
   firebaseConfig.authDomain = 'localhost';

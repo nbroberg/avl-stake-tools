@@ -33,28 +33,54 @@ function loadDotEnvLocal() {
 
 const local = loadDotEnvLocal();
 const readEnv = (key, fallback = '') => process.env[key] ?? local[key] ?? fallback;
+const readFlag = (key) => readEnv(key, 'false') === 'true';
+
+// FORCE_DEMO_MODE builds the demo-only bundle that ships under /demo/.
+// It implies availability: a forced build that wasn't also "available"
+// would boot the real app against config it deliberately doesn't have,
+// so the two can't be set inconsistently.
+const forceDemoMode = readFlag('FORCE_DEMO_MODE');
+
+// A forced build gets BLANK Firebase config, whatever the environment
+// offers. Demo mode swaps out every Firestore-backed service, so the
+// values would be dead weight - but more to the point, the demo is
+// published to an unauthenticated public path, and "no project config in
+// that bundle" should be a property of the build rather than a lucky
+// consequence of CI not having a .env.local. Without this, running the
+// demo build on a developer machine quietly bakes the real project's
+// config into it.
+const firebaseEnv = (key) => (forceDemoMode ? '' : readEnv(key));
 
 const config = {
   firebase: {
-    apiKey: readEnv('FIREBASE_API_KEY'),
-    authDomain: readEnv('FIREBASE_AUTH_DOMAIN'),
-    projectId: readEnv('FIREBASE_PROJECT_ID'),
-    storageBucket: readEnv('FIREBASE_STORAGE_BUCKET'),
-    messagingSenderId: readEnv('FIREBASE_MESSAGING_SENDER_ID'),
-    appId: readEnv('FIREBASE_APP_ID'),
+    apiKey: firebaseEnv('FIREBASE_API_KEY'),
+    authDomain: firebaseEnv('FIREBASE_AUTH_DOMAIN'),
+    projectId: firebaseEnv('FIREBASE_PROJECT_ID'),
+    storageBucket: firebaseEnv('FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: firebaseEnv('FIREBASE_MESSAGING_SENDER_ID'),
+    appId: firebaseEnv('FIREBASE_APP_ID'),
   },
-  googleAuthHd: readEnv('GOOGLE_AUTH_HD', ''),
+  googleAuthHd: forceDemoMode ? '' : readEnv('GOOGLE_AUTH_HD', ''),
   // Demo mode (mock data, no Firebase) is always available in a dev build.
   // This flag is what lets a PRODUCTION build offer it, so it defaults to
   // false: a normal deploy can't be talked into showing fake data.
-  enableDemoMode: readEnv('ENABLE_DEMO_MODE', 'false') === 'true',
+  enableDemoMode: forceDemoMode || readFlag('ENABLE_DEMO_MODE'),
+  // ...and this one makes a build demo-ONLY, with no switch back. See the
+  // header comment in src/app/core/demo/demo-mode.ts.
+  forceDemoMode,
 };
 
 const missing = Object.entries(config.firebase)
   .filter(([, value]) => !value)
   .map(([key]) => key);
 
-if (missing.length) {
+if (forceDemoMode) {
+  // Expected, not a problem: demo mode replaces every Firestore-backed
+  // service, so a forced build has no use for Firebase config and is
+  // built without it on purpose. Warning here would cry wolf on every
+  // demo deploy.
+  console.log('[generate-environment] Demo-only build - Firebase config intentionally omitted.');
+} else if (missing.length) {
   console.warn(
     `[generate-environment] Missing Firebase config values: ${missing.join(', ')}. ` +
       'The app will still build, but Firebase calls will fail at runtime until these ' +

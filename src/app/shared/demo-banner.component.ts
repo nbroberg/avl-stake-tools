@@ -3,7 +3,7 @@ import { AuthService } from '../core/auth.service';
 // Type-only: importing the class itself would pull the demo chunk into
 // the initial bundle, which is exactly what main.ts avoids.
 import type { DemoAuthService } from '../core/demo/demo-auth.service';
-import { demoMode, exitDemoMode } from '../core/demo/demo-mode';
+import { demoMode, demoModeForced, exitDemoMode } from '../core/demo/demo-mode';
 import { ALL_ROLES, type Role } from '../models/types';
 
 /**
@@ -51,13 +51,18 @@ const SHORT_ROLE_LABELS: Record<Role, string> = {
             }
           </select>
         </label>
-        <button type="button" class="demo-exit" (click)="exit()">Exit</button>
+        <!-- The /demo/ build has no real app behind it to exit to, so the
+             control is absent there rather than dead. -->
+        @if (!forced) {
+          <button type="button" class="demo-exit" (click)="exit()">Exit</button>
+        }
       </div>
     }
   `,
 })
 export class DemoBannerComponent {
   protected readonly demoMode = demoMode;
+  protected readonly forced = demoModeForced;
   protected readonly roles = ALL_ROLES;
   protected readonly shortRoleLabels = SHORT_ROLE_LABELS;
 

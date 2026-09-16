@@ -1,0 +1,6 @@
+# /demo/ is a build of this app running on invented data - fake names,
+# fake units, fake callings. It is public and unauthenticated on purpose,
+# but it should not turn up in a search for the real stake or sit beside
+# the real tool in results, so keep crawlers out of it.
+User-agent: *
+Disallow: /demo/
