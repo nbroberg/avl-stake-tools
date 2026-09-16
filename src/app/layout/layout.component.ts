@@ -43,10 +43,10 @@ const TEXT_INPUT_TYPES = new Set([
         <a routerLink="/units" routerLinkActive="active">Units</a>
         <a routerLink="/assignments" routerLinkActive="active">Assignments</a>
         <a routerLink="/callings" routerLinkActive="active">Callings</a>
+        <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
         @if (isPresidency(authService.appUser())) {
           <a routerLink="/lcr-recording" routerLinkActive="active">Recording</a>
         }
-        <a routerLink="/advancements" routerLinkActive="active">Advancements</a>
         <a routerLink="/help" routerLinkActive="active">Help</a>
       </nav>
       <main class="app-main">
