@@ -33,7 +33,11 @@ const TEXT_INPUT_TYPES = new Set([
         <button class="btn app-signout" (click)="signOut()">Sign out</button>
       </header>
       <nav class="app-nav" [class.keyboard-active]="keyboardActive()" aria-label="Primary">
-        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+        <a
+          class="dashboard-tab"
+          routerLink="/"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
           >Dashboard</a
         >
         <a routerLink="/units" routerLinkActive="active">Units</a>

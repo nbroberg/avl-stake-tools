@@ -318,6 +318,11 @@ input:not([type='checkbox']):not([type='radio']), select, textarea {
    only matters on phones, where the bar is fixed in the first place. */
 @media (max-width: 719.98px) {
   .app-nav.keyboard-active { display: none; }
+  /* Dashboard is redundant as a bottom tab - the brand link and every
+     "back to start" flow already land there, and dropping it leaves more
+     room for the tabs that don't have another way in. Still shown in the
+     top strip at 720px+ below, where space isn't as tight. */
+  .app-nav a.dashboard-tab { display: none; }
 }
 
 .app-nav a {
