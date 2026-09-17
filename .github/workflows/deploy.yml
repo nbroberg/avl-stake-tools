@@ -175,15 +175,15 @@ jobs:
           if [ -d "$demo_out" ]; then
             mkdir -p "$out/demo"
             cp -R "$demo_out/." "$out/demo/"
-            # Pages looks for the nearest 404.html up the requested path,
-            # so this is what makes /demo/callings/<id> survive a refresh
-            # and boot the DEMO app - without it the request would fall
-            # through to the root 404.html, which is production built
-            # with base-href "/".
-            cp "$out/demo/index.html" "$out/demo/404.html"
             # CNAME is a root-level Pages concern; a copy nested under
             # /demo/ does nothing but invite confusion.
             rm -f "$out/demo/CNAME"
+            # Deep links into /demo/ need help: Pages serves the ROOT
+            # 404.html for every unmatched path, however deep, so
+            # /demo/callings would otherwise hand back production. A
+            # nested /demo/404.html is never consulted - that's a Jekyll
+            # behaviour and this is an artifact deploy. See the script.
+            node scripts/wire-demo-deep-links.mjs "$out"
             echo "Demo built from ${{ inputs.demo_ref || github.sha }} -> /demo/"
           else
             echo "::warning::Demo build produced no output; publishing without /demo/."
