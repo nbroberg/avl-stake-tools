@@ -453,6 +453,19 @@ demo and not production. The next push to `main` rebuilds `/demo/` from
 `public/robots.txt` keeps crawlers out of `/demo/` so invented stake data
 never lands in search results next to the real tool.
 
+**Deep links into `/demo/` take a detour.** GitHub Pages serves the
+*root* `404.html` for every unmatched path however deep, and a `404.html`
+placed inside `/demo/` is never consulted (that's Jekyll behaviour; this
+is an artifact deploy with `.nojekyll`). Left alone, `/demo/callings`
+would hand back production's `index.html` and drop the visitor in the
+real sign-in screen. So `scripts/wire-demo-deep-links.mjs` injects two
+small scripts at assembly time — the root `404.html` recognises a
+`/demo/` path, stashes it and bounces to `/demo/`; the demo
+`index.html` puts it back with `history.replaceState` before Angular
+boots. Production's own deep links are untouched. This only ever mattered
+on refresh, shared links and "open in new tab" — in-app navigation never
+round-trips.
+
 ### 5. GitHub setup
 
 **Enable Pages via Actions.** In your GitHub repo:
