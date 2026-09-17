@@ -424,6 +424,35 @@ build time, so a normal deploy cannot be talked into showing fake data by
 anyone who guesses the URL. Either way the mock dataset lives in a lazy
 chunk that a normal build never loads.
 
+### The deployed demo — lcr.avlstake.org/demo/
+
+The deploy workflow builds the app twice and ships both in one Pages
+artifact: the root is production, and **`/demo/` is a demo-only build**
+(`FORCE_DEMO_MODE=true`). That path is mock data unconditionally — no
+`?demo=1`, no sign-in, and no Exit button, because there is nothing
+behind it to exit to. `lcr.avlstake.org` itself is unchanged: it is built
+without `ENABLE_DEMO_MODE`, so the real app still cannot be switched into
+demo mode at all.
+
+The demo build ships **no Firebase config whatsoever** —
+`generate-environment.mjs` blanks it whenever `FORCE_DEMO_MODE` is set,
+rather than relying on CI happening not to have a `.env.local`. Because
+`firebase.ts` is evaluated eagerly even in demo mode (`AuthService` is a
+DI token in the initial bundle), it substitutes placeholder config in
+that case so `initializeApp()` doesn't throw on an empty key. Nothing
+ever calls it — every Firestore-backed service has been swapped out.
+
+**To preview a branch there**, run *Deploy to GitHub Pages* from the
+Actions tab and set **`demo_ref`** to the branch. That branch lands at
+`/demo/` while production stays on `main` — which is the point: review a
+change in a real browser, on a phone, before promoting it. The demo half
+of the build is non-blocking, so a branch that doesn't compile costs the
+demo and not production. The next push to `main` rebuilds `/demo/` from
+`main`, so it reverts to matching production until the next dispatch.
+
+`public/robots.txt` keeps crawlers out of `/demo/` so invented stake data
+never lands in search results next to the real tool.
+
 ### 5. GitHub setup
 
 **Enable Pages via Actions.** In your GitHub repo:

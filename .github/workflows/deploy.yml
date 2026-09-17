@@ -12,6 +12,26 @@
 # public/CNAME must ship in every deploy artifact or GitHub Pages drops
 # the custom domain on the next Actions-based deploy.
 #
+# The artifact carries TWO apps. The root is production, built from this
+# ref against the real Firebase project. /demo/ is a second build of the
+# same source with FORCE_DEMO_MODE=true and no Firebase config at all -
+# mock data, a pretend signed-in user, no login. Pages only serves one
+# site per repo and its one custom domain is already spent on
+# lcr.avlstake.org, so a path is what a second app can have here.
+#
+# The demo build can come from a DIFFERENT ref than the root: run this
+# workflow from the Actions tab and set demo_ref to a branch to put that
+# branch's app at lcr.avlstake.org/demo/ while production stays on main.
+# That is the point of the whole arrangement - review a change in a real
+# browser, on a phone, before it is promoted to the root. A push to main
+# rebuilds /demo/ from main, so the demo reverts to matching production
+# until the next dispatch.
+#
+# The demo half is deliberately non-blocking: a branch that doesn't
+# compile must not be able to hold production's redeploy hostage, so
+# those steps continue-on-error and the assemble step simply omits /demo/
+# if the build produced nothing.
+#
 # Firestore rules are NOT deployed by this workflow - that stays a
 # deliberate manual step via `firebase deploy --only firestore:rules`,
 # so a rules change requires a reviewed local command rather than
@@ -28,6 +48,12 @@ on:
     branches: [main]
   # Manual trigger from the Actions tab for redeploys without a code change.
   workflow_dispatch:
+    inputs:
+      demo_ref:
+        description: 'Branch, tag or SHA to build /demo/ from (blank = same ref as production)'
+        required: false
+        type: string
+        default: ''
 
 # One in-flight deploy per ref. Cancel superseded runs so a rapid burst
 # of pushes ends with the newest commit live, not whichever finished
@@ -93,14 +119,75 @@ jobs:
         run: |
           npx ng build --configuration production --base-href "/"
 
+      # ---- /demo/ ----------------------------------------------------
+      # Checked out into its own directory so demo_ref can name a branch
+      # that isn't the one being deployed to the root. Everything from
+      # here to "Build demo" is continue-on-error: a work-in-progress
+      # branch failing to compile should cost the demo, not production.
+
+      - name: Check out the demo ref
+        id: demo-checkout
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.demo_ref || github.sha }}
+          path: demo-src
+
+      - name: Install demo dependencies
+        if: steps.demo-checkout.outcome == 'success'
+        id: demo-install
+        continue-on-error: true
+        working-directory: demo-src
+        run: npm ci
+
+      - name: Generate demo environment.ts
+        if: steps.demo-install.outcome == 'success'
+        id: demo-env
+        continue-on-error: true
+        working-directory: demo-src
+        # No Firebase secrets on purpose. Demo mode replaces every
+        # Firestore-backed service, so this bundle has no use for them,
+        # and an unauthenticated public path is the last place to widen
+        # where project config appears. FORCE_DEMO_MODE makes the build
+        # demo-only - see src/app/core/demo/demo-mode.ts.
+        env:
+          FORCE_DEMO_MODE: 'true'
+        run: node scripts/generate-environment.mjs
+
+      - name: Build demo
+        if: steps.demo-env.outcome == 'success'
+        id: demo-build
+        continue-on-error: true
+        working-directory: demo-src
+        run: npx ng build --configuration production --base-href "/demo/"
+
       - name: Prepare Pages artifact
         run: |
+          set -euo pipefail
           out=dist/avl-stake-tools/browser
           # SPA fallback: 404.html serves index.html so deep-linked routes
           # (/callings/<id>, /scope, etc.) survive a hard refresh.
           cp "$out/index.html" "$out/404.html"
           # Tell GitHub Pages not to run its Jekyll layer over the build.
           touch "$out/.nojekyll"
+
+          demo_out=demo-src/dist/avl-stake-tools/browser
+          if [ -d "$demo_out" ]; then
+            mkdir -p "$out/demo"
+            cp -R "$demo_out/." "$out/demo/"
+            # Pages looks for the nearest 404.html up the requested path,
+            # so this is what makes /demo/callings/<id> survive a refresh
+            # and boot the DEMO app - without it the request would fall
+            # through to the root 404.html, which is production built
+            # with base-href "/".
+            cp "$out/demo/index.html" "$out/demo/404.html"
+            # CNAME is a root-level Pages concern; a copy nested under
+            # /demo/ does nothing but invite confusion.
+            rm -f "$out/demo/CNAME"
+            echo "Demo built from ${{ inputs.demo_ref || github.sha }} -> /demo/"
+          else
+            echo "::warning::Demo build produced no output; publishing without /demo/."
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
