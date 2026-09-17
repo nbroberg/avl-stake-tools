@@ -15,7 +15,7 @@ import {
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
-import { namesFor, tally } from '../../core/advancement-review';
+import { namesFor, tally } from '../../core/hc-vote';
 import {
   personSatisfiesPriesthood,
   PRIESTHOOD_REQUIREMENT_LABELS,

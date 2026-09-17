@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  awaitsResponseFrom,
+  advancementAwaitsResponseFrom,
   hasRespondedTo,
-  isOpenForHighCouncilVote,
+  isAdvancementOpenForHcVote,
   namesFor,
   tally,
-} from '../src/app/core/advancement-review';
+} from '../src/app/core/hc-vote';
 import type {
   AdvancementHistoryEntry,
   AppUser,
@@ -39,45 +39,45 @@ function user(patch: Partial<AppUser> = {}): AppUser {
   };
 }
 
-describe('isOpenForHighCouncilVote', () => {
+describe('isAdvancementOpenForHcVote', () => {
   it('is open at presidency_approved', () => {
-    expect(isOpenForHighCouncilVote(workflow())).toBe(true);
+    expect(isAdvancementOpenForHcVote(workflow())).toBe(true);
   });
 
   it('is closed at any other status', () => {
-    expect(isOpenForHighCouncilVote(workflow({ status: 'proposed' }))).toBe(false);
-    expect(isOpenForHighCouncilVote(workflow({ status: 'high_council_approved' }))).toBe(false);
+    expect(isAdvancementOpenForHcVote(workflow({ status: 'proposed' }))).toBe(false);
+    expect(isAdvancementOpenForHcVote(workflow({ status: 'high_council_approved' }))).toBe(false);
   });
 });
 
-describe('awaitsResponseFrom', () => {
+describe('advancementAwaitsResponseFrom', () => {
   it('awaits a high councilor who has not responded', () => {
-    expect(awaitsResponseFrom(workflow(), user())).toBe(true);
+    expect(advancementAwaitsResponseFrom(workflow(), user())).toBe(true);
   });
 
   it('does not await someone who already approved', () => {
     const w = workflow({ hcApprovalUids: ['hc1'] });
-    expect(awaitsResponseFrom(w, user())).toBe(false);
+    expect(advancementAwaitsResponseFrom(w, user())).toBe(false);
     expect(hasRespondedTo(w, user())).toBe(true);
   });
 
   it('does not await someone holding a concern - they have responded', () => {
     const w = workflow({ hcConcernUids: ['hc1'] });
-    expect(awaitsResponseFrom(w, user())).toBe(false);
+    expect(advancementAwaitsResponseFrom(w, user())).toBe(false);
     expect(hasRespondedTo(w, user())).toBe(true);
   });
 
   it('never awaits the presidency', () => {
-    expect(awaitsResponseFrom(workflow(), user({ role: 'stake_presidency' }))).toBe(false);
+    expect(advancementAwaitsResponseFrom(workflow(), user({ role: 'stake_presidency' }))).toBe(false);
   });
 
   it('never awaits a signed-out or deactivated user', () => {
-    expect(awaitsResponseFrom(workflow(), null)).toBe(false);
-    expect(awaitsResponseFrom(workflow(), user({ active: false }))).toBe(false);
+    expect(advancementAwaitsResponseFrom(workflow(), null)).toBe(false);
+    expect(advancementAwaitsResponseFrom(workflow(), user({ active: false }))).toBe(false);
   });
 });
 
-describe('tally', () => {
+describe('tally (advancements)', () => {
   it('counts approvals against the snapshotted threshold', () => {
     const t = tally(workflow({ hcApprovalUids: ['a', 'b', 'c'], hcRequired: 3 }));
     expect(t.approved).toBe(3);
@@ -100,7 +100,7 @@ describe('tally', () => {
   });
 });
 
-describe('namesFor', () => {
+describe('namesFor (advancements)', () => {
   const history: AdvancementHistoryEntry[] = [
     { id: 'h1', status: 'proposed', changedBy: 'u0', changedByName: 'President Sample' },
     { id: 'h2', status: 'presidency_approved', changedBy: 'hc2', changedByName: 'Councilor Two' },

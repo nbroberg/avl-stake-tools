@@ -6,21 +6,17 @@ import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
 import {
-  awaitsResponseFrom as awaitsCallingResponseFrom,
-  isOpenForHighCouncilVote as isCallingOpenForHcVote,
-  namesFor as callingNamesFor,
-  tally as callingTally,
-} from '../core/hc-review';
-import {
-  awaitsResponseFrom as awaitsAdvancementResponseFrom,
-  isOpenForHighCouncilVote as isAdvancementOpenForHcVote,
-  namesFor as advancementNamesFor,
-  tally as advancementTally,
-} from '../core/advancement-review';
+  advancementAwaitsResponseFrom,
+  callingAwaitsResponseFrom,
+  isAdvancementOpenForHcVote,
+  isCallingOpenForHcVote,
+  namesFor,
+  tally,
+  type HcTally,
+} from '../core/hc-vote';
 import { isPresidency } from '../core/roles';
 import { workflowScopeLabel } from '../core/units';
 import { formatTimestamp } from '../core/calling-status';
-import type { HcTally } from '../core/hc-vote';
 import {
   ADVANCEMENT_TYPE_LABELS,
   type CallingWorkflow,
@@ -317,12 +313,12 @@ export class AssignmentsComponent {
    * list here instead of a bare count. No per-workflow history lookup is
    * needed for this half: "is it waiting on me" only depends on the
    * workflow's own vote arrays, not on resolving anyone else's name.
-   * Empty for a presidency user - awaitsResponseFrom() is HC-only.
+   * Empty for a presidency user - callingAwaitsResponseFrom() is HC-only.
    */
   protected readonly myVotes = computed<PersonalRow[]>(() => {
     const user = this.authService.appUser();
     const callingRows: PersonalRow[] = this.workflows()
-      .filter((w) => awaitsCallingResponseFrom(w, user))
+      .filter((w) => callingAwaitsResponseFrom(w, user))
       .map((w) => ({
         id: w.id,
         type: w.workflowType,
@@ -331,7 +327,7 @@ export class AssignmentsComponent {
         link: ['/callings', w.id],
       }));
     const advancementRows: PersonalRow[] = this.advancementWorkflows()
-      .filter((w) => awaitsAdvancementResponseFrom(w, user))
+      .filter((w) => advancementAwaitsResponseFrom(w, user))
       .map((w) => ({
         id: w.id,
         type: 'advancement' as const,
@@ -432,9 +428,9 @@ export class AssignmentsComponent {
                       title: w.callingName,
                       subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
                       link: ['/callings', w.id],
-                      tally: callingTally(w),
-                      approverNames: callingNamesFor(w.hcApprovalUids ?? [], history),
-                      concernNames: callingNamesFor(w.hcConcernUids ?? [], history),
+                      tally: tally(w),
+                      approverNames: namesFor(w.hcApprovalUids ?? [], history),
+                      concernNames: namesFor(w.hcConcernUids ?? [], history),
                     }),
                   ),
                 ),
@@ -460,9 +456,9 @@ export class AssignmentsComponent {
                       title: ADVANCEMENT_TYPE_LABELS[w.advancementType],
                       subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
                       link: ['/advancements', w.id],
-                      tally: advancementTally(w),
-                      approverNames: advancementNamesFor(w.hcApprovalUids ?? [], history),
-                      concernNames: advancementNamesFor(w.hcConcernUids ?? [], history),
+                      tally: tally(w),
+                      approverNames: namesFor(w.hcApprovalUids ?? [], history),
+                      concernNames: namesFor(w.hcConcernUids ?? [], history),
                     }),
                   ),
                 ),

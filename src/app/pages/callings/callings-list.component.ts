@@ -7,7 +7,7 @@ import { CallingsService } from '../../core/callings.service';
 import { estimateInitialPageSize } from '../../core/page-size';
 import { canCreateWorkflow } from '../../core/roles';
 import { workflowScopeLabel } from '../../core/units';
-import { awaitsResponseFrom } from '../../core/hc-review';
+import { callingAwaitsResponseFrom } from '../../core/hc-vote';
 import { AuthService } from '../../core/auth.service';
 import { LoadMoreSentinelDirective } from '../../shared/load-more-sentinel.directive';
 import { StatusBadgeComponent } from '../../shared/status-badge.component';
@@ -203,7 +203,7 @@ export class CallingsListComponent {
   /** Workflows this signed-in high councilor still owes a response. */
   protected readonly awaitingMine = computed(() => {
     const user = this.authService.appUser();
-    return (this.workflows() ?? []).filter((w) => awaitsResponseFrom(w, user));
+    return (this.workflows() ?? []).filter((w) => callingAwaitsResponseFrom(w, user));
   });
 
   protected readonly awaitingCount = computed(() => this.awaitingMine().length);
@@ -216,6 +216,6 @@ export class CallingsListComponent {
   });
 
   protected awaitsMe(w: CallingWorkflow): boolean {
-    return awaitsResponseFrom(w, this.authService.appUser());
+    return callingAwaitsResponseFrom(w, this.authService.appUser());
   }
 }

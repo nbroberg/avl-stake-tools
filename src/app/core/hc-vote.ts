@@ -1,5 +1,10 @@
+import { requiresHighCouncilApproval } from './calling-authorities';
 import { isHighCouncil } from './roles';
-import type { AppUser } from '../models/types';
+import type {
+  AppUser,
+  CallingWorkflow,
+  PriesthoodAdvancementWorkflow,
+} from '../models/types';
 
 /**
  * The high council vote mechanics - tally, uid->name resolution, "have you
@@ -9,11 +14,15 @@ import type { AppUser } from '../models/types';
  * against the minimal structural shape each workflow type actually needs to
  * satisfy, rather than duplicating it per flow.
  *
- * What's deliberately NOT here: "is this workflow open for a vote right
- * now" varies per flow (a calling's vote is also gated on
- * requiresHighCouncilApproval(callingName); an advancement's isn't), so
- * that stays in core/hc-review.ts and core/advancement-review.ts, each of
- * which composes with awaitsResponseFrom() here via its own openness check.
+ * The one genuinely per-flow question is "is this workflow open for a vote
+ * right now": a calling's vote is also gated on
+ * requiresHighCouncilApproval(callingName), since some callings are
+ * approved outside the stake (First Presidency, Twelve, a GA) and never
+ * reach a high council vote at all; an advancement's isn't. Those two
+ * predicates, and the per-flow awaits* helpers bound to them, live at the
+ * bottom of this file. They are the only part that names a concrete
+ * workflow type - everything above stays structural.
+ *
  * None of this is a security boundary - firestore.rules decides what an HC
  * member may actually write. These functions only decide what to show.
  */
@@ -116,4 +125,51 @@ export function namesFor(
     else unnamed++;
   }
   return { names: names.sort((a, b) => a.localeCompare(b)), unnamed };
+}
+
+// ---------------------------------------------------------------------
+// Per-flow openness. Everything above is structural; these name concrete
+// workflow types because the difference between the flows IS the domain
+// rule, and there is nothing to generalise over.
+// ---------------------------------------------------------------------
+
+/** The one status at which a high council vote is open, either flow. */
+const VOTING_STATUS = 'presidency_approved';
+
+/**
+ * True when this calling is at the point of needing high council votes.
+ * Note the second clause: a calling whose authority sits outside the
+ * stake never opens for a vote at all, whatever its status.
+ */
+export function isCallingOpenForHcVote(workflow: CallingWorkflow): boolean {
+  return workflow.status === VOTING_STATUS && requiresHighCouncilApproval(workflow.callingName);
+}
+
+/**
+ * True when this advancement is at the point of needing high council
+ * votes. Every advancement goes through the same SP+HC review, so unlike
+ * a calling this is just the status check.
+ */
+export function isAdvancementOpenForHcVote(workflow: PriesthoodAdvancementWorkflow): boolean {
+  return workflow.status === VOTING_STATUS;
+}
+
+/**
+ * True when this user still owes this calling a response - on the high
+ * council, vote open, and neither approved nor concerned. Drives the
+ * "awaiting you" surfacing.
+ */
+export function callingAwaitsResponseFrom(
+  workflow: CallingWorkflow,
+  user: AppUser | null,
+): boolean {
+  return awaitsResponseFrom(isCallingOpenForHcVote(workflow), workflow, user);
+}
+
+/** The advancement counterpart of callingAwaitsResponseFrom. */
+export function advancementAwaitsResponseFrom(
+  workflow: PriesthoodAdvancementWorkflow,
+  user: AppUser | null,
+): boolean {
+  return awaitsResponseFrom(isAdvancementOpenForHcVote(workflow), workflow, user);
 }
