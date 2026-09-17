@@ -8,6 +8,7 @@ import {
   type ReleaseStatus,
 } from '../models/types';
 import { requiresHighCouncilApproval } from './calling-authorities';
+import { nextInOrder, previousRollbackTarget } from './status-ladder';
 
 /**
  * The full status list for a given workflow, with `high_council_approved`
@@ -40,29 +41,22 @@ export function getNextStatuses(
   currentStatus: string,
   callingName?: string,
 ): string[] {
-  const order = statusOrderFor(workflowType, callingName);
-  const idx = order.indexOf(currentStatus);
-  if (idx === -1 || idx === order.length - 1) return [];
-  return [order[idx + 1]];
+  return nextInOrder(statusOrderFor(workflowType, callingName), currentStatus);
 }
 
 /**
  * The status one step before `currentStatus`, or null when there isn't one
- * (already at `proposed`, or the status isn't recognized). `recorded_in_lcr`
- * is filtered out of the order first: CallingsService.advanceStatus never
- * actually persists it as a workflow's `status` - advancing to it finalizes
- * straight to `complete` in the same write (see its `finalizes` handling) -
- * so it would never be a real rollback target either.
+ * (already at `proposed`, or the status isn't recognized). The skipping of
+ * `recorded_in_lcr`, which CallingsService.advanceStatus never persists on
+ * its own, lives in previousRollbackTarget - it applies to the advancement
+ * ladder identically.
  */
 export function getPreviousStatus(
   workflowType: CallingWorkflowType,
   currentStatus: string,
   callingName?: string,
 ): string | null {
-  const order = statusOrderFor(workflowType, callingName).filter((s) => s !== 'recorded_in_lcr');
-  const idx = order.indexOf(currentStatus);
-  if (idx <= 0) return null;
-  return order[idx - 1];
+  return previousRollbackTarget(statusOrderFor(workflowType, callingName), currentStatus);
 }
 
 /** Maps a status to the CallingWorkflow date field it should stamp, if any. */
