@@ -1,260 +1,144 @@
 import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 /**
- * In-app "how do I use this thing" reference - the live counterpart to
- * docs/user-guide.md in the repo. Kept as a plain authenticated page (not
- * fetched from the markdown file at runtime) so it works offline and needs
- * no markdown renderer; keep the two in sync by hand when either changes.
+ * Plain-language "how do I use this thing" page, written for someone who
+ * isn't especially technical - a stake presidency or high council member,
+ * not a software person. Exact statuses, ordering rules, and edge cases
+ * live on the Help Reference page instead (see HelpReferenceComponent),
+ * linked from the bottom of this one, so this page can stay short.
  */
 @Component({
   selector: 'app-help',
   standalone: true,
+  imports: [RouterLink],
   template: `
     <div class="stack">
       <div>
         <h1 style="margin: 0 0 0.25rem">Help</h1>
         <p class="muted" style="margin: 0">
-          How to use this app as a stake presidency or high council member.
+          Everything you need to use this app as a stake presidency or high council member.
+        </p>
+      </div>
+
+      <div class="card stack home-screen">
+        <h2 style="margin: 0">Add this app to your phone's Home Screen</h2>
+        <p style="margin: 0">
+          Once it's on your Home Screen, you open it with one tap - no need to remember the
+          address or dig through your bookmarks.
+        </p>
+        <details>
+          <summary>iPhone or iPad (Safari)</summary>
+          <ol class="help-list">
+            <li>
+              Open this site in <strong>Safari</strong> - this option doesn't show up in Chrome or
+              other browsers on an iPhone.
+            </li>
+            <li>
+              Tap the <strong>Share</strong> button (the square with an arrow pointing up),
+              usually along the bottom of the screen.
+            </li>
+            <li>Scroll down the menu that pops up and tap <strong>Add to Home Screen</strong>.</li>
+            <li>Tap <strong>Add</strong> in the top right corner.</li>
+          </ol>
+        </details>
+        <details>
+          <summary>Android phone or tablet (Chrome)</summary>
+          <ol class="help-list">
+            <li>Open this site in <strong>Chrome</strong>.</li>
+            <li>Tap the three dots (⋮) in the top right corner.</li>
+            <li>
+              Tap <strong>Add to Home screen</strong> (some phones show
+              <strong>Install app</strong> instead).
+            </li>
+            <li>Tap <strong>Add</strong> (or <strong>Install</strong>) to confirm.</li>
+          </ol>
+        </details>
+      </div>
+
+      <div class="card stack">
+        <h2 style="margin: 0">What this app is for</h2>
+        <p style="margin: 0">
+          It keeps track of callings, releases, and priesthood advancements from start to
+          finish - who's being called or released, who's approved it, whether it's been
+          sustained, recorded with the stake, and set apart - so nothing falls through the cracks
+          and everyone involved can see where things stand.
         </p>
       </div>
 
       <div class="card stack">
-        <h2 style="margin: 0">Roles</h2>
-        <p>
-          <strong>Stake Presidency</strong> — full access: create and edit any calling, release,
-          or priesthood advancement; delete a workflow created in error; advance or roll back any
-          step; override sustaining requirements when needed, including bulk-marking every
-          outstanding unit sustained at once; and the only role that can mark (or undo marking) a
-          calling or release recorded in LCR.
+        <h2 style="margin: 0">What you can do</h2>
+        <p style="margin: 0">
+          <strong>Stake Presidency</strong> can create and manage every calling, release, and
+          advancement from start to finish.
         </p>
         <p style="margin: 0">
-          <strong>High Council</strong> — can see everything, but can only act at specific points:
-          casting a vote (approve or raise a concern) once a proposal reaches Stake Presidency
-          Approved; recording what happens during a Sunday visit to a unit — sustaining,
-          releasing, setting apart, or ordaining, in person; and, once a calling has begun
-          Finalizing, logging that it was set apart even outside a Sunday visit, always under
-          their own name.
+          <strong>High Council</strong> members can see everything, vote to approve proposals, and
+          record what happens during a Sunday visit - sustaining, releasing, setting apart, or
+          ordaining someone in person.
         </p>
         <p class="muted text-sm" style="margin: 0">
-          Your role is set by whoever administers the app for your stake — there's no way to
-          change your own role or anyone else's from inside the app.
+          Your role is set up for you ahead of time - see Questions or access requests below if it
+          looks wrong.
         </p>
       </div>
 
       <div class="card stack">
-        <h2 style="margin: 0">Getting around</h2>
+        <h2 style="margin: 0">Finding your way around</h2>
         <dl class="help-dl">
           <dt>Dashboard</dt>
-          <dd>Your starting point after signing in.</dd>
+          <dd>Your starting point after signing in - a quick look at what needs attention.</dd>
           <dt>Units</dt>
-          <dd>Pick the ward or branch you're visiting this Sunday to see what needs doing there.</dd>
+          <dd>Pick the ward or branch you're visiting this Sunday to see exactly what needs doing there.</dd>
           <dt>Assignments</dt>
-          <dd>Everything currently waiting on you, and — for the presidency — everything waiting stake-wide.</dd>
+          <dd>Everything currently waiting on you personally.</dd>
           <dt>Callings</dt>
-          <dd>Every calling and release workflow, from proposal through completion.</dd>
-          <dt>LCR Recording</dt>
-          <dd>Stake Presidency only. Everything at least one unit has sustained but LCR hasn't recorded yet.</dd>
+          <dd>Every calling and release, from the first proposal through completion.</dd>
           <dt>Advancements</dt>
-          <dd>Priest → Elder and Elder → High Priest workflows.</dd>
+          <dd>Priesthood advancements - Priest to Elder, and Elder to High Priest.</dd>
         </dl>
       </div>
 
       <div class="card stack">
-        <h2 style="margin: 0">Proposing a calling or release</h2>
-        <p class="muted text-sm" style="margin: 0">Presidency only, from Callings → + New.</p>
-        <ol class="help-list">
-          <li>Choose <strong>New Calling</strong> or <strong>Release</strong>.</li>
-          <li>
-            Pick the calling. For a release, the dropdown only lists callings someone currently
-            holds — you can't release from an empty seat.
-          </li>
-          <li>
-            For a ward, branch, or elders quorum calling, pick the unit — this narrows the person
-            list to that unit. Stake-level callings have no unit to pick.
-          </li>
-          <li>
-            If a single-seat calling is already filled, you'll see who holds it with a
-            <strong>Release ↗</strong> link that opens a release for them in a new tab.
-          </li>
-          <li>
-            Search for and select the person. The list is filtered to who qualifies (priesthood
-            office, an existing calling where one's normally required, etc.) — a note explains
-            what's filtering the list.
-          </li>
-          <li>Optionally add notes, then <strong>Create</strong>.</li>
-        </ol>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">The calling lifecycle</h2>
-        <p style="margin: 0">
-          A new calling moves through these steps in order — nothing skipped, apart from the
-          presidency's override abilities noted below:
-        </p>
-        <ol class="help-list">
-          <li><strong>Proposed</strong> — created by the presidency.</li>
-          <li><strong>Stake Presidency Approved</strong> — the presidency's own sign-off.</li>
-          <li>
-            <strong>High Council Approved</strong> — reached once enough councilors approve (see
-            High council voting below). Skipped for callings approved outside the stake, or ones
-            that don't need council approval.
-          </li>
-          <li><strong>Interview Assigned</strong> — someone is assigned to interview the person and extend the calling.</li>
-          <li><strong>Interview / Calling Extended</strong> — the interview happened and the calling was extended.</li>
-          <li><strong>Accepted</strong> — the person accepted.</li>
-          <li>
-            <strong>Finalizing</strong> — entered the moment one unit sustains the calling. From
-            here, sustaining (every unit, not just one), recording in LCR, and setting apart are
-            tracked independently and can happen in any order — see Sustaining and setting apart
-            below. The status shown is whichever of <strong>Sustained</strong>,
-            <strong>Set Apart</strong>, or <strong>Recorded in LCR</strong> (shown as
-            "Awaiting setting apart" once that's the only thing left) best reflects what's
-            actually happened so far.
-          </li>
-          <li><strong>Complete</strong> — reached automatically once every unit has sustained it, it's recorded in LCR, and it's been set apart. Nothing to click.</li>
-        </ol>
-        <p style="margin: 0">
-          A <strong>release</strong> is shorter, skips both the high council vote and the
-          interview assignment, and has no setting-apart step — otherwise the same Finalizing
-          rules apply:
-        </p>
-        <p class="muted" style="margin: 0">
-          Proposed → Stake Presidency Approved → Release Extended → Released → Finalizing
-          (Sustained / Recorded in LCR) → Complete
-        </p>
-        <p class="text-sm muted" style="margin: 0">
-          Every workflow's detail page has a History section at the bottom showing every status
-          change, who made it, and when.
-        </p>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">High council voting</h2>
-        <p style="margin: 0">
-          Once a calling reaches Stake Presidency Approved (and needs council approval), it opens
-          for a vote. Each councilor acts individually:
-        </p>
-        <dl class="help-dl">
-          <dt>Approve</dt>
-          <dd>Tap once to arm it, tap again to confirm.</dd>
-          <dt>Withdraw my approval</dt>
-          <dd>Undo your approval, as long as the workflow hasn't advanced past this step yet.</dd>
-          <dt>Raise a concern</dt>
+        <h2 style="margin: 0">Common questions</h2>
+        <dl class="faq">
+          <dt>How do I propose a new calling or release?</dt>
           <dd>
-            Flags the workflow without blocking anyone else's approval count. You can only hold
-            one position at a time — approving clears a standing concern and vice versa.
+            From <strong>Callings</strong>, tap <strong>+ New</strong>, choose Calling or Release,
+            and follow the prompts. (Presidency only.)
+          </dd>
+          <dt>How do I vote on a calling as high council?</dt>
+          <dd>
+            Open the calling from your <strong>Assignments</strong> page and tap Approve or Raise
+            a concern.
+          </dd>
+          <dt>How do I mark someone sustained or set apart?</dt>
+          <dd>
+            Go to <strong>Units</strong>, pick the ward or branch you're visiting, and use the
+            buttons next to their name.
+          </dd>
+          <dt>I made a mistake - can it be fixed?</dt>
+          <dd>
+            Yes. From the calling or release's own page, the presidency can roll it back one step,
+            or delete it entirely if it was created by mistake.
           </dd>
         </dl>
-        <p style="margin: 0">
-          <strong>A concern is not a veto.</strong> It doesn't change how many approvals are
-          needed, but it does stop the council from advancing the workflow on its own until it's
-          talked through or cleared. The presidency can still advance a workflow with an open
-          concern if genuinely necessary — that's recorded in the history.
-        </p>
-        <p class="text-sm muted" style="margin: 0">
-          You'll see the running tally (e.g. "7 of 9 approvals") but not who specifically hasn't
-          voted yet — that's deliberate, so chasing stragglers stays a real conversation. The
-          presidency additionally sees who approved and who raised a concern, by name.
-        </p>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">Sustaining, recording, and setting apart</h2>
-        <p style="margin: 0">
-          A ward, branch, or elders quorum calling is sustained once, in that unit. A
-          <strong>stake-level</strong> calling has no single stake conference to sustain it at in
-          this app's model, so it's sustained ward by ward as the presidency or council visits
-          each unit — the detail page shows how many units have signed off so far, and the
-          calling enters Finalizing the moment the first one does.
-        </p>
-        <p style="margin: 0">
-          The presidency can mark individual units sustained even before every unit confirms, or
-          use <strong>Mark all units sustained</strong> to bulk-mark everything still outstanding
-          at once (after a confirmation listing which units) — units marked this way show
-          "marked by Stake Presidency" next to them, and that bulk mark can be undone on its own
-          without touching any unit that reported for itself.
-        </p>
-        <p style="margin: 0">
-          Once Finalizing has begun, recording in LCR and setting apart can each happen at any
-          time, in either order — recording doesn't require setting apart first, and vice versa.
-          Recording is still done manually in LCR; the <strong>LCR Recording</strong> page (Stake
-          Presidency only) lists every calling and release waiting on it, and marking it here only
-          records that it happened, when, and by whom, without closing the workflow on its own.
-          A calling closes only once it's fully sustained, recorded, <em>and</em> set apart; a
-          release doesn't need setting apart. Both the recorded mark and the set-apart mark can be
-          undone.
-        </p>
-        <p class="text-sm muted" style="margin: 0">
-          Setting apart is recorded from the calling's detail page, or from Units on the Sunday
-          you're actually with the person. If the same visit both sustains someone and sets them
-          apart, the app offers "Sustain &amp; set apart" as one combined action — it no longer
-          has to be the visit that finishes a stake-wide calling's sustaining. A calling that's
-          fully sustained and recorded but not yet set apart shows as "Awaiting setting apart", in
-          both the stake-wide list and the person's home unit's view.
-        </p>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">Priesthood Advancements</h2>
-        <p style="margin: 0">
-          Simpler than a calling — no interview or sustaining, since there's no calling attached
-          to an ordination:
-        </p>
-        <p class="muted" style="margin: 0">
-          Proposed → Stake Presidency Approved → High Council Approved → Ordained → Recorded in
-          LCR → Complete
-        </p>
-        <p class="text-sm muted" style="margin: 0">
-          The two types are Priest → Elder and Elder → High Priest. High council voting works the
-          same way as for callings. Who performed the ordination is a free-text entry — often a
-          family member rather than whoever's recording it.
-        </p>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">Units — what to do this Sunday</h2>
-        <p style="margin: 0">
-          Pick the ward or branch you're visiting to see four lists, filtered to just what's ready
-          to act on today: <strong>Needs sustaining</strong>, <strong>Releases</strong>,
-          <strong>Needs setting apart</strong>, and <strong>Ordinations pending</strong>. A stake
-          calling that's fully sustained and recorded but still needs setting apart shows
-          "Awaiting setting apart" there too, even though the calling itself belongs to the
-          stake, not the unit - it's a reminder, since that's most likely where the person
-          attends. Proposing new callings, casting HC votes, and adding notes still happen from
-          the Callings/Advancements pages themselves.
-        </p>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">Assignments — what's waiting on you</h2>
-        <p style="margin: 0">
-          <strong>Your assignments</strong> shows High Council votes you personally owe a response
-          on, and interviews you're assigned to conduct.
-        </p>
-        <p style="margin: 0">
-          If you're the presidency, <strong>Outstanding across the stake</strong> additionally
-          shows everything newly proposed and awaiting review, every open High Council vote
-          stake-wide with the running tally, and every interview assignment stake-wide.
-        </p>
-      </div>
-
-      <div class="card stack">
-        <h2 style="margin: 0">Rolling back or deleting a workflow</h2>
-        <p style="margin: 0">
-          Both are presidency-only, from a workflow's detail page. <strong>Roll back</strong>
-          moves a workflow back exactly one step. <strong>Delete</strong> removes the workflow
-          entirely, for something created in error — its history is kept even after deletion, so
-          the audit trail survives.
-        </p>
       </div>
 
       <div class="card stack">
         <h2 style="margin: 0">Questions or access requests</h2>
         <p style="margin: 0">
-          There's no self-service way to change roles or add new users from inside the app. If you
-          need access, or your role needs to change, contact your Stake Clerk or Admin directly.
+          There's no way to change roles or add new users from inside the app. If you need access,
+          or your role needs to change, contact your Stake Clerk or Admin directly.
         </p>
       </div>
+
+      <p style="margin: 0">
+        <a routerLink="/help/reference"
+          >Looking for the technical details - every status and exact rule a calling, release, or
+          advancement follows? See the Detailed Reference &rarr;</a
+        >
+      </p>
     </div>
   `,
   styles: [
@@ -282,12 +166,41 @@ import { Component } from '@angular/core';
           margin-bottom: 0.5rem;
         }
       }
+      /* Unlike help-dl's short labels, an FAQ question is a full sentence -
+         always one column, question bold on its own line. */
+      .faq {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+      .faq dt {
+        font-weight: 600;
+        margin-top: 0.6rem;
+      }
+      .faq dt:first-of-type { margin-top: 0; }
+      .faq dd { margin: 0; color: var(--text); }
       .help-list {
         margin: 0;
         padding-left: 1.25rem;
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+      }
+      .home-screen details {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.6rem 0.75rem;
+      }
+      .home-screen details + details {
+        margin-top: -0.25rem;
+      }
+      .home-screen summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .home-screen details[open] summary {
+        margin-bottom: 0.5rem;
       }
     `,
   ],
