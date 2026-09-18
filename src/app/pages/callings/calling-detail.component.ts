@@ -78,7 +78,12 @@ function displayStatusLabel(w: CallingWorkflow): string {
       <div class="stack">
         <div class="row-between">
           <div>
-            <h1 style="margin: 0">{{ w.callingName }}</h1>
+            <h1 style="margin: 0">
+              {{ w.callingName }}
+              <span class="type-tag type-tag-{{ w.workflowType }}">{{
+                w.workflowType === 'release' ? 'Release' : 'Calling'
+              }}</span>
+            </h1>
             <p class="muted" style="margin: 0">{{ w.personName }} &middot; {{ workflowScopeLabel(w.unit) }}</p>
             @if (w.assignedTo) {
               <p class="text-sm" style="margin: 0.25rem 0 0">
@@ -620,6 +625,28 @@ function displayStatusLabel(w: CallingWorkflow): string {
       @media (max-width: 639.98px) {
         /* A cell with no note would otherwise render as an empty stacked row. */
         .history .note-empty { display: none; }
+      }
+      /* Landing on this page directly (deep link, notification) gives no
+         other cue whether it's a calling or a release - the status badge
+         alone doesn't disambiguate since both ladders share status words.
+         Matches the type-tag convention from callings-list/assignments. */
+      .type-tag {
+        display: inline-block;
+        margin-left: 0.4rem;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        vertical-align: middle;
+      }
+      .type-tag-calling {
+        background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+        color: var(--primary);
+      }
+      .type-tag-release {
+        background: color-mix(in srgb, var(--release) 18%, var(--surface));
+        color: var(--release);
       }
     `,
   ],
