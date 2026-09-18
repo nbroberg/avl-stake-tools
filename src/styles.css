@@ -4,7 +4,10 @@
    bar to a strip under the header). */
 
 :root {
-  color-scheme: light;
+  /* Both themes are supported - see the prefers-color-scheme block at the
+     bottom of this file. Declaring both keeps form controls, scrollbars and
+     the like in step with whichever one the OS asks for. */
+  color-scheme: light dark;
   --bg: #f4f6f8;
   --surface: #ffffff;
   --text: #1a2733;
@@ -18,6 +21,26 @@
   /* Distinct from --warn (used for in-page "concern" text) so a release-type
      tag never reads as a warning next to an actual concern on the same card. */
   --release: #c2410c;
+
+  /* --primary does double duty: it's the navy BEHIND white text (header,
+     bottom nav, .btn-primary) and it was also the colour OF text (links,
+     focus ring). Those pull in opposite directions once there's a dark
+     theme - a navy light enough to read on a dark background is too light
+     to put white text on. So the text role gets its own token. In light
+     mode it's the same navy, deliberately, so nothing shifts. */
+  --link: #1c3f60;
+  /* Same split for --danger, which is both a button background carrying
+     white text and the colour of .text-danger. */
+  --danger-text: #b3261e;
+
+  /* Hairline rule over a card - was rgba(26, 39, 51, 0.14) inline in three
+     components, i.e. dark ink at low alpha, which disappears entirely on a
+     dark background. Tokenised so the dark theme can flip to light ink. */
+  --divider: rgba(26, 39, 51, 0.14);
+  /* Tinted row marking "this one is waiting on you". */
+  --row-highlight: #dbe7f5;
+  /* Preformatted blocks (diagnostics output, pasted data). */
+  --code-bg: #eef1f4;
 
   /* Minimum comfortable touch target (iOS HIG / Material both land near 44px). */
   --tap: 44px;
@@ -70,7 +93,7 @@ h1 {
 }
 
 a {
-  color: var(--primary);
+  color: var(--link);
 }
 
 button, input, select, textarea {
@@ -87,7 +110,7 @@ button {
 /* Visible keyboard/switch-control focus, including for people pairing a
    keyboard with a tablet. */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--link);
   outline-offset: 2px;
 }
 
@@ -95,7 +118,7 @@ button {
 input[type='checkbox'], input[type='radio'] {
   width: 1.25rem;
   height: 1.25rem;
-  accent-color: var(--primary);
+  accent-color: var(--link);
   flex: none;
 }
 
@@ -220,7 +243,7 @@ input:not([type='checkbox']):not([type='radio']), select, textarea {
 }
 
 .muted { color: var(--muted); }
-.text-danger { color: var(--danger); }
+.text-danger { color: var(--danger-text); }
 .text-sm { font-size: 0.85rem; }
 
 .list-item {
@@ -518,7 +541,11 @@ th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--borde
   font-size: 0.78rem;
 }
 
-.demo-role select option { color: #1a2733; }
+/* Native option lists render on the OS menu surface, which follows the OS
+   theme - so a hardcoded dark ink is wrong in dark mode. `inherit` would
+   take the banner's white, invisible on a light menu; this follows the
+   document's own text colour, which flips with the theme. */
+.demo-role select option { color: var(--text); background: var(--surface); }
 
 .demo-exit {
   flex: none;
@@ -571,7 +598,7 @@ th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--borde
 pre {
   white-space: pre-wrap;
   word-break: break-word;
-  background: #eef1f4;
+  background: var(--code-bg);
   padding: 0.75rem;
   border-radius: 8px;
   font-size: 0.85rem;
@@ -582,4 +609,71 @@ pre {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------------------------------------------------------------------
+   Dark theme.
+
+   Follows the OS setting only - there's deliberately no in-app toggle to
+   forget, get out of step with the phone, or need persisting. Everything
+   here is a token override: no layout, no new rules, so a component can't
+   be styled for one theme and not the other.
+
+   Two things stay put on purpose. The header, bottom nav and demo banner
+   keep white text on a dark chrome colour in BOTH themes, so the
+   rgba(255,255,255,...) values sitting on them need no dark variant. And
+   --primary stays a navy rather than inverting, because it's the brand
+   colour behind that white text; it's only nudged lighter so a primary
+   button still separates from the (now dark) card behind it.
+   --------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1720;
+    --surface: #16212c;
+    --text: #e6edf3;
+    --muted: #9cb0c0;
+    --border: #2b3a49;
+
+    /* Lightened just enough to sit above --surface; still dark enough to
+       carry white text on the header and .btn-primary. */
+    --primary: #24557f;
+    --primary-dark: #1b415f;
+
+    /* The text-role tokens invert properly - these are never behind white
+       text, only ever the ink itself or a border. */
+    --link: #7fb8ee;
+    --accent: #58bd92;
+    --danger-text: #f08a80;
+    --warn: #e0a83a;
+    --release: #f08a52;
+    /* ...while --danger stays a background carrying white text. */
+    --danger: #c23b32;
+
+    --divider: rgba(230, 237, 243, 0.14);
+    --row-highlight: #1e3247;
+    --code-bg: #101a24;
+
+    /* Status badges: the light theme's pale chip with dark ink becomes a
+       deep chip with light ink. Same hues, same meanings, same ordering -
+       cool blues through to green as work completes. */
+    --badge-neutral-bg: #2a3744;      --badge-neutral-fg: #c3ced9;
+    --badge-neutral-dim-bg: #2a3744;  --badge-neutral-dim-fg: #9cb0c0;
+    --badge-navy-bg: #1e3a57;         --badge-navy-fg: #a9cdf0;
+    --badge-navy-pale-bg: #1b3348;    --badge-navy-pale-fg: #a9cdf0;
+    --badge-blue-bg: #133b5c;         --badge-blue-fg: #8fccff;
+    --badge-blue-alt-bg: #143d5f;     --badge-blue-alt-fg: #8fccff;
+    --badge-orange-bg: #4a2f10;       --badge-orange-fg: #f2b872;
+    --badge-amber-bg: #453818;        --badge-amber-fg: #edc879;
+    --badge-mint-bg: #163a2a;         --badge-mint-fg: #7fd6a6;
+    --badge-olive-bg: #2a3a1c;        --badge-olive-fg: #b3d98a;
+    --badge-green-bg: #17402d;        --badge-green-fg: #86dcac;
+    --badge-green-deep-bg: #123a26;   --badge-green-deep-fg: #6fd39a;
+    --badge-indigo-bg: #2a2a55;       --badge-indigo-fg: #b0b0ee;
+    --badge-red-soft-bg: #46201d;     --badge-red-soft-fg: #f0a49c;
+    --badge-red-bg: #4d211c;          --badge-red-fg: #f4a9a0;
+  }
+
+  /* The one place a light theme could leak in: an <img>/<svg> or an
+     embedded map would keep its own colours, but there are none today, so
+     there's deliberately nothing else here. */
 }

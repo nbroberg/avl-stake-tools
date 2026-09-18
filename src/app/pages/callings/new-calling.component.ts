@@ -334,7 +334,7 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
         padding: 0.85rem 0.75rem;
         /* The whole row is the tap target for the radio inside it. */
         min-height: var(--tap);
-        border-top: 1px solid rgba(26, 39, 51, 0.14);
+        border-top: 1px solid var(--divider);
         cursor: pointer;
         touch-action: manipulation;
         transition: background-color 120ms ease;
