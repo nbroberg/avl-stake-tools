@@ -327,3 +327,92 @@ describe('diagnostics (intentionally open to any signed-in user)', () => {
     await assertFails(getDoc(doc(db, 'diagnostics', 'anyone')));
   });
 });
+
+describe('callingWorkflows - high council votes are calling-only', () => {
+  // The high council weighs in on who gets CALLED, not who gets released:
+  // RELEASE_STATUS_ORDER has no `high_council_approved` rung, so a vote
+  // recorded against a release could never advance anything.
+  //
+  // Both documents sit at `presidency_approved` and differ only by
+  // workflowType, which is exactly the distinction the rules missed - the
+  // vote clause keyed on status alone, so a release of an HC-approved
+  // calling was writable. The UI never offered the button (the detail page
+  // had the guard the shared predicate lacked), but the boundary is the
+  // rules, not the UI.
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const base = {
+        status: 'presidency_approved',
+        callingName: 'Elders Quorum President',
+        hcApprovalUids: [],
+        hcConcernUids: [],
+        hcRequired: 9,
+      };
+      await setDoc(doc(ctx.firestore(), 'callingWorkflows', 'wf-call-open'), {
+        ...base,
+        workflowType: 'calling',
+      });
+      await setDoc(doc(ctx.firestore(), 'callingWorkflows', 'wf-release-open'), {
+        ...base,
+        workflowType: 'release',
+      });
+    });
+  });
+
+  it('lets a high councilor approve a CALLING at presidency_approved', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-call-open'), {
+        hcApprovalUids: [COUNCILOR_UID],
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does NOT let a high councilor approve a RELEASE', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-release-open'), {
+        hcApprovalUids: [COUNCILOR_UID],
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does NOT let a high councilor raise a concern on a RELEASE', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-release-open'), {
+        hcConcernUids: [COUNCILOR_UID],
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does NOT let a high councilor advance a RELEASE to high_council_approved', async () => {
+    // Quorum is seeded as already met, so only the release check can fail
+    // this - it isn't passing merely for want of approvals.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'callingWorkflows', 'wf-release-open'), {
+        workflowType: 'release',
+        status: 'presidency_approved',
+        callingName: 'Elders Quorum President',
+        hcApprovalUids: Array.from({ length: 9 }, (_, i) => `hc${i}`),
+        hcConcernUids: [],
+        hcRequired: 9,
+      });
+    });
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'callingWorkflows', 'wf-release-open'), {
+        status: 'high_council_approved',
+        highCouncilApprovedDate: new Date(),
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+});

@@ -18,7 +18,7 @@ import {
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
-import { namesFor, tally } from '../../core/hc-vote';
+import { callingNeedsHcApproval, namesFor, tally } from '../../core/hc-vote';
 import { stakeUnits, unitLabel, workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';
@@ -35,7 +35,6 @@ import {
   personSatisfiesPriesthood,
   priesthoodRequirementFor,
   requiresExternalApproval,
-  requiresHighCouncilApproval,
 } from '../../core/calling-authorities';
 import {
   ADVANCEMENT_TYPE_LABELS,
@@ -678,13 +677,16 @@ export class CallingDetailComponent {
    * Releases never pass through `high_council_approved` - the release
    * ladder (RELEASE_STATUS_ORDER) skips straight from presidency approval
    * to extending the release, since the high council only weighs in on
-   * who gets called, not who gets released. Gate on workflowType here
-   * rather than only on the calling's approval body, or a release of an
-   * HC-approved calling would wrongly show the vote card.
+   * who gets called, not who gets released.
+   *
+   * This used to re-derive that rule inline, which is how it drifted: the
+   * card was correctly hidden here while the assignment and calling lists
+   * went on telling high councilors the release awaited their vote. Both
+   * now ask core/hc-vote.ts.
    */
   protected readonly needsHcApproval = computed(() => {
     const w = this.workflow();
-    return !!w && w.workflowType !== 'release' && requiresHighCouncilApproval(w.callingName);
+    return !!w && callingNeedsHcApproval(w);
   });
 
   protected readonly externalApproval = computed(() => {

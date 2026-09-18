@@ -137,12 +137,30 @@ export function namesFor(
 const VOTING_STATUS = 'presidency_approved';
 
 /**
- * True when this calling is at the point of needing high council votes.
- * Note the second clause: a calling whose authority sits outside the
- * stake never opens for a vote at all, whatever its status.
+ * Whether this workflow ever passes through a high council vote at all -
+ * independent of where it currently sits.
+ *
+ * Two separate reasons it might not:
+ *
+ *  1. It's a RELEASE. Releases don't go back through the high council;
+ *     RELEASE_STATUS_ORDER has no `high_council_approved` rung, so a vote
+ *     there could never advance anything even if it were cast.
+ *  2. The calling's approving authority sits outside the stake (First
+ *     Presidency, the Twelve, a GA), so no stake body votes on it.
+ *
+ * Clause 1 used to live only in CallingDetailComponent, which meant the
+ * detail page correctly hid the approval card for a release while the
+ * assignment list, callings list and dashboard all still told high
+ * councilors a release was awaiting their vote. Keeping the rule in one
+ * place is the point of this function.
  */
+export function callingNeedsHcApproval(workflow: CallingWorkflow): boolean {
+  return workflow.workflowType !== 'release' && requiresHighCouncilApproval(workflow.callingName);
+}
+
+/** True when this calling is at the point of needing high council votes. */
 export function isCallingOpenForHcVote(workflow: CallingWorkflow): boolean {
-  return workflow.status === VOTING_STATUS && requiresHighCouncilApproval(workflow.callingName);
+  return callingNeedsHcApproval(workflow) && workflow.status === VOTING_STATUS;
 }
 
 /**
