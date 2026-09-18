@@ -268,7 +268,7 @@ const TYPE_LABELS: Record<RowType, string> = {
         color: var(--primary);
       }
       .type-tag-release {
-        background: color-mix(in srgb, var(--release) 18%, white);
+        background: color-mix(in srgb, var(--release) 18%, var(--surface));
         color: var(--release);
       }
       .type-tag-advancement {

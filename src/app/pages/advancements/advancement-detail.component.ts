@@ -380,7 +380,7 @@ import {
         gap: 0.7rem;
         padding: 0.6rem 0.75rem;
         min-height: var(--tap);
-        border-top: 1px solid rgba(26, 39, 51, 0.14);
+        border-top: 1px solid var(--divider);
         cursor: pointer;
         touch-action: manipulation;
       }

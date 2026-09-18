@@ -60,7 +60,7 @@ function labelFor(w: CallingWorkflow): string {
         margin-top: 0.35rem;
         padding: 0.15rem 0.5rem;
         border-radius: 999px;
-        background: #dbe7f5;
+        background: var(--row-highlight);
         color: var(--primary);
         font-size: 0.7rem;
         font-weight: 700;

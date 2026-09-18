@@ -40,10 +40,10 @@ function initialChecks(): Check[] {
 }
 
 const RESULT_STYLE: Record<CheckResult, { label: string; bg: string; fg: string }> = {
-  idle: { label: 'Not run', bg: '#e4e9ee', fg: '#5b6b78' },
-  running: { label: 'Running…', bg: '#dbe7f5', fg: '#1c3f60' },
-  pass: { label: 'Pass', bg: '#d7f0df', fg: '#1a5c34' },
-  fail: { label: 'Fail', bg: '#f7dede', fg: '#a3241a' },
+  idle: { label: 'Not run', bg: 'var(--badge-neutral-dim-bg, #e4e9ee)', fg: 'var(--badge-neutral-dim-fg, #5b6b78)' },
+  running: { label: 'Running…', bg: 'var(--badge-navy-bg, #dbe7f5)', fg: 'var(--badge-navy-fg, #1c3f60)' },
+  pass: { label: 'Pass', bg: 'var(--badge-green-deep-bg, #d7f0df)', fg: 'var(--badge-green-deep-fg, #1a5c34)' },
+  fail: { label: 'Fail', bg: 'var(--badge-red-bg, #f7dede)', fg: 'var(--badge-red-fg, #a3241a)' },
 };
 
 /**
