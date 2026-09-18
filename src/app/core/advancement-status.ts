@@ -1,26 +1,25 @@
 import { ADVANCEMENT_STATUS_ORDER, type PriesthoodAdvancementWorkflow } from '../models/types';
+import { nextInOrder, previousRollbackTarget } from './status-ladder';
 
 /**
- * The advancement ladder is strictly linear - unlike calling-status.ts,
- * there's no calling-name-dependent step to skip, since (for now) every
+ * The advancement ladder is strictly linear and - unlike calling-status.ts -
+ * has no calling-name-dependent step to skip, since (for now) every
  * advancement goes through both the stake presidency and the high council.
+ * So there's one fixed order to hand to the shared walk in
+ * core/status-ladder.ts, where callings have to derive theirs first.
  */
 export function getNextStatuses(currentStatus: string): string[] {
-  const idx = ADVANCEMENT_STATUS_ORDER.indexOf(currentStatus as never);
-  if (idx === -1 || idx === ADVANCEMENT_STATUS_ORDER.length - 1) return [];
-  return [ADVANCEMENT_STATUS_ORDER[idx + 1]];
+  return nextInOrder(ADVANCEMENT_STATUS_ORDER, currentStatus);
 }
 
 /**
- * See calling-status.ts's getPreviousStatus - same reasoning, including
- * filtering out `recorded_in_lcr`, which PriesthoodAdvancementsService also
- * collapses straight into `complete` and never persists on its own.
+ * See core/status-ladder.ts for the walk, including why `recorded_in_lcr`
+ * is skipped - PriesthoodAdvancementsService collapses it straight into
+ * `complete` and never persists it on its own, exactly as CallingsService
+ * does.
  */
 export function getPreviousStatus(currentStatus: string): string | null {
-  const order = ADVANCEMENT_STATUS_ORDER.filter((s) => s !== 'recorded_in_lcr');
-  const idx = order.indexOf(currentStatus as never);
-  if (idx <= 0) return null;
-  return order[idx - 1];
+  return previousRollbackTarget(ADVANCEMENT_STATUS_ORDER, currentStatus);
 }
 
 /** Maps a status to the PriesthoodAdvancementWorkflow date field it should stamp. */
