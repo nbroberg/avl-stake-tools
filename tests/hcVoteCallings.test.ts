@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   callingAwaitsResponseFrom,
+  callingNeedsHcApproval,
   hasRespondedTo,
   isCallingOpenForHcVote,
   namesFor,
@@ -55,6 +56,37 @@ describe('isCallingOpenForHcVote', () => {
   it('is closed for callings approved outside the stake', () => {
     // Bishop goes to the First Presidency, not the high council.
     expect(isCallingOpenForHcVote(workflow({ callingName: 'Bishop' }))).toBe(false);
+  });
+
+  it('is closed for a RELEASE, even of a calling that needed the vote', () => {
+    // The high council weighs in on who gets called, not who gets
+    // released: RELEASE_STATUS_ORDER has no `high_council_approved` rung,
+    // so a vote here could never advance anything. Regression test - this
+    // returned true for every release of an HC-approved calling sitting at
+    // presidency_approved, which put releases in front of high councilors
+    // as "awaiting your response" on the assignments and callings lists.
+    expect(isCallingOpenForHcVote(workflow({ workflowType: 'release' }))).toBe(false);
+    expect(
+      isCallingOpenForHcVote(
+        workflow({ workflowType: 'release', callingName: 'Elders Quorum President' }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('callingNeedsHcApproval', () => {
+  it('is true for a calling whose approving body is the stake presidency and high council', () => {
+    expect(callingNeedsHcApproval(workflow())).toBe(true);
+  });
+
+  it('ignores status - it answers "ever", not "right now"', () => {
+    expect(callingNeedsHcApproval(workflow({ status: 'proposed' }))).toBe(true);
+    expect(callingNeedsHcApproval(workflow({ status: 'complete' }))).toBe(true);
+  });
+
+  it('is false for a release and for externally-approved callings', () => {
+    expect(callingNeedsHcApproval(workflow({ workflowType: 'release' }))).toBe(false);
+    expect(callingNeedsHcApproval(workflow({ callingName: 'Bishop' }))).toBe(false);
   });
 });
 

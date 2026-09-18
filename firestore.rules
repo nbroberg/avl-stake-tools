@@ -183,9 +183,15 @@ service cloud.firestore {
      * Withdrawal is only possible while the vote is still open; once the
      * workflow advances past `presidency_approved`, this rule stops
      * matching and the recorded votes are frozen.
+     *
+     * Releases are excluded outright. The high council weighs in on who
+     * gets called, not who gets released, and RELEASE_STATUS_ORDER has no
+     * `high_council_approved` rung - so a vote recorded on a release could
+     * never advance anything, and has no business being stored.
      */
     function isHighCouncilSelfVote() {
-      return resource.data.status == 'presidency_approved'
+      return resource.data.workflowType != 'release'
+        && resource.data.status == 'presidency_approved'
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['hcApprovalUids', 'hcConcernUids', 'updatedAt', 'updatedBy'])
         && othersUnchanged(
@@ -210,7 +216,10 @@ service cloud.firestore {
      * without the presidency deciding to.
      */
     function isHighCouncilQuorumAdvance() {
-      return resource.data.status == 'presidency_approved'
+      // Releases never reach `high_council_approved` - it isn't in their
+      // ladder at all - so this path must not be open to them either.
+      return resource.data.workflowType != 'release'
+        && resource.data.status == 'presidency_approved'
         && request.resource.data.status == 'high_council_approved'
         && resource.data.hcApprovalUids.size() >= resource.data.hcRequired
         && resource.data.get('hcConcernUids', []).size() == 0
