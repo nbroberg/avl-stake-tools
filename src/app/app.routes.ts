@@ -15,6 +15,7 @@ import { AdvancementDetailComponent } from './pages/advancements/advancement-det
 import { UnitsComponent } from './pages/units.component';
 import { LcrRecordingComponent } from './pages/lcr-recording.component';
 import { HelpComponent } from './pages/help.component';
+import { HelpReferenceComponent } from './pages/help-reference.component';
 
 export const routes: Routes = [
   // Public routes - no sign-in required.
@@ -39,6 +40,7 @@ export const routes: Routes = [
       { path: 'advancements/new', component: NewAdvancementComponent },
       { path: 'advancements/:id', component: AdvancementDetailComponent },
       { path: 'help', component: HelpComponent },
+      { path: 'help/reference', component: HelpReferenceComponent },
     ],
   },
 
