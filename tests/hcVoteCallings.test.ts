@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  awaitsResponseFrom,
+  callingAwaitsResponseFrom,
   hasRespondedTo,
-  isOpenForHighCouncilVote,
+  isCallingOpenForHcVote,
   namesFor,
   tally,
-} from '../src/app/core/hc-review';
+} from '../src/app/core/hc-vote';
 import type {
   AppUser,
   CallingStatusHistoryEntry,
@@ -42,50 +42,50 @@ function user(patch: Partial<AppUser> = {}): AppUser {
   };
 }
 
-describe('isOpenForHighCouncilVote', () => {
+describe('isCallingOpenForHcVote', () => {
   it('is open for a calling that needs the vote, at presidency_approved', () => {
-    expect(isOpenForHighCouncilVote(workflow())).toBe(true);
+    expect(isCallingOpenForHcVote(workflow())).toBe(true);
   });
 
   it('is closed at any other status', () => {
-    expect(isOpenForHighCouncilVote(workflow({ status: 'proposed' }))).toBe(false);
-    expect(isOpenForHighCouncilVote(workflow({ status: 'high_council_approved' }))).toBe(false);
+    expect(isCallingOpenForHcVote(workflow({ status: 'proposed' }))).toBe(false);
+    expect(isCallingOpenForHcVote(workflow({ status: 'high_council_approved' }))).toBe(false);
   });
 
   it('is closed for callings approved outside the stake', () => {
     // Bishop goes to the First Presidency, not the high council.
-    expect(isOpenForHighCouncilVote(workflow({ callingName: 'Bishop' }))).toBe(false);
+    expect(isCallingOpenForHcVote(workflow({ callingName: 'Bishop' }))).toBe(false);
   });
 });
 
-describe('awaitsResponseFrom', () => {
+describe('callingAwaitsResponseFrom', () => {
   it('awaits a high councilor who has not responded', () => {
-    expect(awaitsResponseFrom(workflow(), user())).toBe(true);
+    expect(callingAwaitsResponseFrom(workflow(), user())).toBe(true);
   });
 
   it('does not await someone who already approved', () => {
     const w = workflow({ hcApprovalUids: ['hc1'] });
-    expect(awaitsResponseFrom(w, user())).toBe(false);
+    expect(callingAwaitsResponseFrom(w, user())).toBe(false);
     expect(hasRespondedTo(w, user())).toBe(true);
   });
 
   it('does not await someone holding a concern - they have responded', () => {
     const w = workflow({ hcConcernUids: ['hc1'] });
-    expect(awaitsResponseFrom(w, user())).toBe(false);
+    expect(callingAwaitsResponseFrom(w, user())).toBe(false);
     expect(hasRespondedTo(w, user())).toBe(true);
   });
 
   it('never awaits the presidency', () => {
-    expect(awaitsResponseFrom(workflow(), user({ role: 'stake_presidency' }))).toBe(false);
+    expect(callingAwaitsResponseFrom(workflow(), user({ role: 'stake_presidency' }))).toBe(false);
   });
 
   it('never awaits a signed-out or deactivated user', () => {
-    expect(awaitsResponseFrom(workflow(), null)).toBe(false);
-    expect(awaitsResponseFrom(workflow(), user({ active: false }))).toBe(false);
+    expect(callingAwaitsResponseFrom(workflow(), null)).toBe(false);
+    expect(callingAwaitsResponseFrom(workflow(), user({ active: false }))).toBe(false);
   });
 });
 
-describe('tally', () => {
+describe('tally (callings)', () => {
   it('counts approvals against the snapshotted threshold', () => {
     const t = tally(workflow({ hcApprovalUids: ['a', 'b', 'c'], hcRequired: 3 }));
     expect(t.approved).toBe(3);
@@ -109,7 +109,7 @@ describe('tally', () => {
   });
 });
 
-describe('namesFor', () => {
+describe('namesFor (callings)', () => {
   const history: CallingStatusHistoryEntry[] = [
     { id: 'h1', status: 'proposed', changedBy: 'u0', changedByName: 'President Sample' },
     { id: 'h2', status: 'presidency_approved', changedBy: 'hc2', changedByName: 'Councilor Two' },

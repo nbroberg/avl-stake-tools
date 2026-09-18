@@ -383,8 +383,7 @@ export interface PriesthoodAdvancementWorkflow {
   /**
    * UIDs of High Council members who have voted to approve this workflow
    * while it sits at `presidency_approved`. Same semantics as
-   * CallingWorkflow.hcApprovalUids - see core/hc-review.ts and
-   * core/advancement-review.ts.
+   * CallingWorkflow.hcApprovalUids - see core/hc-vote.ts.
    */
   hcApprovalUids?: string[];
   /** Same semantics as CallingWorkflow.hcConcernUids. */

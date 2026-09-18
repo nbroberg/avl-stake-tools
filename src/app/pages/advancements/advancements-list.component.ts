@@ -7,7 +7,7 @@ import { PriesthoodAdvancementsService } from '../../core/priesthood-advancement
 import { estimateInitialPageSize } from '../../core/page-size';
 import { canCreateWorkflow } from '../../core/roles';
 import { workflowScopeLabel } from '../../core/units';
-import { awaitsResponseFrom } from '../../core/advancement-review';
+import { advancementAwaitsResponseFrom } from '../../core/hc-vote';
 import { AuthService } from '../../core/auth.service';
 import { LoadMoreSentinelDirective } from '../../shared/load-more-sentinel.directive';
 import { StatusBadgeComponent } from '../../shared/status-badge.component';
@@ -163,7 +163,7 @@ export class AdvancementsListComponent {
 
   protected readonly awaitingMine = computed(() => {
     const user = this.authService.appUser();
-    return (this.workflows() ?? []).filter((w) => awaitsResponseFrom(w, user));
+    return (this.workflows() ?? []).filter((w) => advancementAwaitsResponseFrom(w, user));
   });
 
   protected readonly awaitingCount = computed(() => this.awaitingMine().length);
@@ -176,6 +176,6 @@ export class AdvancementsListComponent {
   });
 
   protected awaitsMe(w: PriesthoodAdvancementWorkflow): boolean {
-    return awaitsResponseFrom(w, this.authService.appUser());
+    return advancementAwaitsResponseFrom(w, this.authService.appUser());
   }
 }

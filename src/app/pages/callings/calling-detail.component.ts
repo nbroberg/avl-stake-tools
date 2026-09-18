@@ -18,7 +18,7 @@ import {
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
-import { namesFor, tally } from '../../core/hc-review';
+import { namesFor, tally } from '../../core/hc-vote';
 import { stakeUnits, unitLabel, workflowScopeLabel } from '../../core/units';
 import { HC_TOTAL } from '../../core/quorum';
 import { AuthService } from '../../core/auth.service';

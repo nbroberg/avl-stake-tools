@@ -5,8 +5,10 @@ import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { PriesthoodAdvancementsService } from '../core/priesthood-advancements.service';
 import { RosterSyncService } from '../core/roster-sync.service';
-import { awaitsResponseFrom } from '../core/hc-review';
-import { awaitsResponseFrom as awaitsAdvancementResponseFrom } from '../core/advancement-review';
+import {
+  advancementAwaitsResponseFrom,
+  callingAwaitsResponseFrom,
+} from '../core/hc-vote';
 import { isHighCouncil, isPresidency } from '../core/roles';
 import type { PriesthoodAdvancementWorkflow, RosterSyncStatus } from '../models/types';
 
@@ -138,12 +140,12 @@ export class DashboardComponent {
 
   protected readonly awaitingCount = computed(() => {
     const user = this.authService.appUser();
-    return this.workflows().filter((w) => awaitsResponseFrom(w, user)).length;
+    return this.workflows().filter((w) => callingAwaitsResponseFrom(w, user)).length;
   });
 
   protected readonly awaitingAdvancementCount = computed(() => {
     const user = this.authService.appUser();
-    return this.advancementWorkflows().filter((w) => awaitsAdvancementResponseFrom(w, user))
+    return this.advancementWorkflows().filter((w) => advancementAwaitsResponseFrom(w, user))
       .length;
   });
 
