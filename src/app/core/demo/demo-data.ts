@@ -347,6 +347,20 @@ const WORKFLOW_SEEDS: WorkflowSeed[] = [
     notes: 'Moving out of the stake at the end of the month.',
   },
   {
+    // Ward-level calling, sustained but not yet recorded or set apart -
+    // the single-unit counterpart to wf-primary-2nd below. Exercises the
+    // "Sustained" card's "Undo sustaining" button (canUndoUnitSustain),
+    // and lands on the LCR Recording page's "not yet recorded" list.
+    id: 'wf-bishopric-2nd-sustained',
+    workflowType: 'calling',
+    personName: 'Samuel Boateng',
+    callingName: 'Bishopric Second Counselor',
+    unit: FAIRHAVEN,
+    status: 'sustained',
+    ageDays: 12,
+    sustainedInUnits: [FAIRHAVEN],
+  },
+  {
     // Finalizing, partway through the stake-wide sustaining checklist -
     // exercises the "Sustaining across the stake" card, the "Mark all
     // units sustained" bulk action, and the Units page's per-unit

@@ -103,3 +103,18 @@ export function canRecordInLcr(user: AppUser | null): boolean {
 
 /** Alias for canRecordInLcr - undoing a recorded mark uses the same eligibility. */
 export const canUndoRecordInLcr = canRecordInLcr;
+
+/**
+ * Only the presidency can undo a ward/branch workflow's sustaining vote -
+ * the one path that rolls a workflow all the way back out of Finalizing to
+ * `accepted`/`released` (see CallingsService.unmarkUnitSustained /
+ * statusAfterRemovingUnits), for a mis-click or a test record entered by
+ * mistake. Not available to High Council: their own sustaining rights (via
+ * a Sunday unit visit - see isHighCouncilMarkSustainedUnit /
+ * isHighCouncilSustain in firestore.rules) only ever move a workflow
+ * forward, never back, so this mirrors that boundary rather than widening
+ * it.
+ */
+export function canUndoUnitSustain(user: AppUser | null): boolean {
+  return isPresidency(user);
+}
