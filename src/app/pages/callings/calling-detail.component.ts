@@ -15,6 +15,7 @@ import {
   canRollbackStatus,
   canUndoRecordInLcr,
   canUndoSetApart,
+  canUndoUnitSustain,
   isHighCouncil,
   isPresidency,
 } from '../../core/roles';
@@ -322,6 +323,21 @@ function displayStatusLabel(w: CallingWorkflow): string {
                 (click)="undoMarkAllUnitsSustained(w)"
               >
                 Undo the Stake Presidency's bulk sustaining mark
+              </button>
+            }
+          </div>
+        }
+
+        @if (w.unit && inFinalizing()) {
+          <div class="card stack">
+            <strong>Sustained</strong>
+            <p class="text-sm" style="margin: 0">
+              Sustained{{ w.sustainedDate ? ' on ' + formatTimestamp(w.sustainedDate) : '' }}
+              in {{ workflowScopeLabel(w.unit) }}.
+            </p>
+            @if (canUndoUnitSustain(authService.appUser())) {
+              <button class="btn btn-responsive" [disabled]="busy()" (click)="undoUnitSustained(w)">
+                Undo sustaining
               </button>
             }
           </div>
@@ -660,6 +676,7 @@ export class CallingDetailComponent {
   protected readonly canUndoSetApart = canUndoSetApart;
   protected readonly canRecordInLcr = canRecordInLcr;
   protected readonly canUndoRecordInLcr = canUndoRecordInLcr;
+  protected readonly canUndoUnitSustain = canUndoUnitSustain;
   protected readonly canMarkAllUnitsSustained = canMarkAllUnitsSustained;
   protected readonly isHighCouncil = isHighCouncil;
   protected readonly isPresidency = isPresidency;
@@ -925,6 +942,25 @@ export class CallingDetailComponent {
       } else {
         await this.callingsService.unmarkUnitSustained(w, unitNumber, actor);
       }
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /**
+   * Undo a ward/branch workflow's own sustaining vote - the single-unit
+   * counterpart of toggleUnitSustained's unmark path above, surfaced for
+   * workflows that don't get the stake-wide checklist card (see
+   * showSustainingChecklist). When nothing else has happened yet (not
+   * recorded, not set apart), this lands the workflow back at
+   * `accepted`/`released` - see CallingsService.statusAfterRemovingUnits.
+   */
+  async undoUnitSustained(w: CallingWorkflow): Promise<void> {
+    const actor = this.authService.appUser();
+    if (!actor || !w.unit) return;
+    this.busy.set(true);
+    try {
+      await this.callingsService.unmarkUnitSustained(w, w.unit, actor);
     } finally {
       this.busy.set(false);
     }
