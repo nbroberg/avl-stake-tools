@@ -149,7 +149,7 @@ export const STAKE_ROLE_GROUPS: readonly StakeRoleGroup[] = [
   },
   {
     label: 'Church Service Missionaries',
-    roles: ['Stake CS Missionary'],
+    roles: ['Stake CS Missionary', 'Service Missionary'],
   },
   {
     label: 'Facilities',
