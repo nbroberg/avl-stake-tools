@@ -91,6 +91,41 @@ export function needsSetApart(workflow: CallingWorkflow): boolean {
   );
 }
 
+/**
+ * True for a workflow in Finalizing that hasn't been marked recorded in
+ * LCR yet - the LCR Recording page's worklist.
+ *
+ * Gated on `recordedDate`, not on `status`, for the same reason
+ * needsSetApart is gated on `setApartDate`. Status beyond `sustained` is
+ * *derived* from full sustaining: calling-status.ts's nextStatus returns
+ * `sustained` whenever `fullySustained` is false, no matter what else is
+ * true, so a stake-wide workflow that HAS been recorded still reports
+ * `sustained` until the last unit votes. `recordedDate` is the fact
+ * itself and is stamped either way - it's what the detail page branches
+ * on too. Keying the worklist off status instead left a recorded
+ * partially-sustained workflow matching neither this nor
+ * isRecordedNotComplete, so it sat in the worklist permanently and
+ * re-stamped its date on every click.
+ */
+export function needsLcrRecording(workflow: CallingWorkflow): boolean {
+  return (
+    (workflow.status === 'sustained' || workflow.status === 'set_apart') &&
+    !workflow.recordedDate
+  );
+}
+
+/**
+ * Recorded in LCR but not yet closed - the LCR Recording page's undo
+ * shelf, and the exact complement of needsLcrRecording within Finalizing.
+ * The `status` arm is kept alongside the `recordedDate` one so a legacy
+ * doc that reached `recorded_in_lcr` before recordedDate was written
+ * still appears.
+ */
+export function isRecordedNotComplete(workflow: CallingWorkflow): boolean {
+  if (workflow.status === 'complete') return false;
+  return workflow.status === 'recorded_in_lcr' || !!workflow.recordedDate;
+}
+
 /** True for a priesthood advancement currently one step away from ordination. */
 export function needsOrdination(workflow: PriesthoodAdvancementWorkflow): boolean {
   return getNextAdvancementStatuses(workflow.status).includes('ordained');

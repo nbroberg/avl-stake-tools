@@ -5,7 +5,12 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { CallingsService } from '../core/callings.service';
 import { canRecordInLcr, canUndoRecordInLcr, isPresidency } from '../core/roles';
-import { requiredUnitsFor } from '../core/sunday-visit';
+import {
+  isFullySustained,
+  isRecordedNotComplete,
+  needsLcrRecording,
+  requiredUnitsFor,
+} from '../core/sunday-visit';
 import { workflowScopeLabel } from '../core/units';
 import { formatTimestamp } from '../core/calling-status';
 import type { CallingWorkflow } from '../models/types';
@@ -88,6 +93,15 @@ import type { CallingWorkflow } from '../models/types';
                     {{ w.personName }} &middot; {{ workflowScopeLabel(w.unit) }}
                   </div>
                   <div class="muted text-sm">Recorded on {{ formatTimestamp(w.recordedDate) }}</div>
+                  <!-- Recorded ahead of the last unit's vote is legitimate,
+                       but it's the reason the workflow is still open - say
+                       so here rather than leaving it looking stuck. -->
+                  @if (!isFullySustained(w)) {
+                    <div class="muted text-sm">
+                      Still sustaining - {{ sustainedCount(w) }} of
+                      {{ requiredUnitCount(w) }} units
+                    </div>
+                  }
                 </div>
                 <div class="row" style="flex-wrap: wrap">
                   <a class="btn text-sm" [routerLink]="['/callings', w.id]">View</a>
@@ -110,6 +124,7 @@ export class LcrRecordingComponent {
   protected readonly canUndoRecordInLcr = canUndoRecordInLcr;
   protected readonly workflowScopeLabel = workflowScopeLabel;
   protected readonly formatTimestamp = formatTimestamp;
+  protected readonly isFullySustained = isFullySustained;
   protected readonly showRecorded = signal(false);
   protected readonly busy = signal(false);
 
@@ -121,12 +136,12 @@ export class LcrRecordingComponent {
   /** At least one unit has sustained (status only reaches `sustained` or
    *  `set_apart` once that's true) and LCR hasn't recorded it yet. */
   protected readonly readyToRecord = computed(() =>
-    (this.workflows() ?? []).filter((w) => w.status === 'sustained' || w.status === 'set_apart'),
+    (this.workflows() ?? []).filter(needsLcrRecording),
   );
 
   /** Recorded, but not yet fully closed - the undo shelf. */
   protected readonly recordedNotComplete = computed(() =>
-    (this.workflows() ?? []).filter((w) => w.status === 'recorded_in_lcr'),
+    (this.workflows() ?? []).filter(isRecordedNotComplete),
   );
 
   protected sustainedCount(w: CallingWorkflow): number {
