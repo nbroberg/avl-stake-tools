@@ -37,6 +37,24 @@ interface CallingDropdownGroup {
 /** Candidates shown in the person picker once there's a search query. */
 const RESULTS_LIMIT = 8;
 
+/**
+ * Calling options rendered at once in the calling picker. The full
+ * vocabulary is 150+ names across two dozen groups, so the picker shows a
+ * browsable first slice and leans on the search box for the rest.
+ */
+const CALLING_RESULTS_LIMIT = 12;
+
+/**
+ * True when every whitespace-separated token in `tokens` appears somewhere
+ * in the calling name or its group label. Matching the group label too is
+ * what makes "bishopric" surface Ward Clerk and "welfare" surface every
+ * self-reliance calling, even though neither word is in those names.
+ */
+function callingMatches(name: string, groupLabel: string, tokens: string[]): boolean {
+  const haystack = `${name} ${groupLabel}`.toLowerCase();
+  return tokens.every((t) => haystack.includes(t));
+}
+
 const CALLING_GROUPS: CallingOptionGroup[] = [
   // Stake callings are LCR-categorized so the dropdown has one optgroup
   // per stake-org section rather than one 100+-item block.
@@ -68,32 +86,68 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
 
         <div class="field">
           <label>Calling name</label>
-          <select
-            [ngModel]="callingName()"
-            (ngModelChange)="callingName.set($event)"
-            name="callingName"
-            required
-          >
-            <option value="" disabled>
-              {{ workflowType() === 'release' ? 'Select a filled calling…' : 'Select a calling…' }}
-            </option>
-            @for (group of displayedCallingGroups(); track group.label) {
-              <optgroup [label]="group.label">
-                @for (opt of group.options; track opt.name) {
-                  <option [value]="opt.name">
-                    {{ opt.name
-                    }}{{ opt.holderCount ? ' — ' + opt.holderCount + ' holder' + (opt.holderCount === 1 ? '' : 's') : '' }}
-                  </option>
+          @if (callingName()) {
+            <div class="picked">
+              <span class="picked-body">
+                <span class="picked-name">{{ callingName() }}</span>
+                @if (selectedCallingGroup(); as g) {
+                  <span class="picked-meta">{{ g }}</span>
                 }
-              </optgroup>
-            }
-          </select>
-          @if (workflowType() === 'release' && displayedCallingGroups().length === 0) {
+              </span>
+              <button type="button" class="btn btn-sm" (click)="clearCalling()">Change</button>
+            </div>
+          } @else if (workflowType() === 'release' && displayedCallingGroups().length === 0) {
             <span class="text-sm muted">
               No in-scope callings are filled in the current roster. Import the roster from LCR
               first, or switch to New Calling.
             </span>
-          } @else if (workflowType() === 'calling' && callingName() && priesthoodLabel(); as label) {
+          } @else {
+            <input
+              type="search"
+              [ngModel]="callingQuery()"
+              (ngModelChange)="callingQuery.set($event)"
+              name="callingQuery"
+              [placeholder]="
+                workflowType() === 'release'
+                  ? 'Search filled callings…'
+                  : 'Search callings…'
+              "
+              aria-label="Search callings by name"
+            />
+            @if (searchedCallingGroups().length > 0) {
+              <div class="calling-list">
+                @for (group of searchedCallingGroups(); track group.label) {
+                  <div class="calling-group">{{ group.label }}</div>
+                  @for (opt of group.options; track opt.name) {
+                    <button
+                      type="button"
+                      class="calling-option"
+                      (click)="selectCalling(opt.name)"
+                    >
+                      <span class="calling-name">{{ opt.name }}</span>
+                      @if (opt.holderCount) {
+                        <span class="calling-meta">
+                          {{ opt.holderCount }}
+                          {{ opt.holderCount === 1 ? 'holder' : 'holders' }}
+                        </span>
+                      }
+                    </button>
+                  }
+                }
+              </div>
+              @if (matchedCallingCount() > shownCallingCount()) {
+                <span class="text-sm muted">
+                  Showing {{ shownCallingCount() }} of {{ matchedCallingCount() }} — keep typing
+                  to narrow.
+                </span>
+              }
+            } @else {
+              <span class="text-sm muted">
+                No calling matches "{{ callingQuery().trim() }}".
+              </span>
+            }
+          }
+          @if (workflowType() === 'calling' && callingName() && priesthoodLabel(); as label) {
             <span class="text-sm muted">
               Priesthood-office requirement: <strong>{{ label }}</strong>.
             </span>
@@ -314,6 +368,75 @@ const CALLING_GROUPS: CallingOptionGroup[] = [
   `,
   styles: [
     `
+      /* Same no-nested-scroll reasoning as .candidate-list below: the list
+         is capped by CALLING_RESULTS_LIMIT rather than by a scroll box. */
+      .calling-list {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        overflow: hidden;
+      }
+      .calling-group {
+        padding: 0.4rem 0.75rem;
+        background: var(--bg);
+        border-top: 1px solid var(--divider);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .calling-group:first-child { border-top: none; }
+      .calling-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        width: 100%;
+        padding: 0.7rem 0.75rem;
+        min-height: var(--tap);
+        border: none;
+        border-top: 1px solid var(--divider);
+        background: none;
+        color: var(--text);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: background-color 120ms ease;
+      }
+      .calling-group + .calling-option { border-top: none; }
+      @media (hover: hover) {
+        .calling-option:hover { background: var(--bg); }
+      }
+      .calling-option:active { background: var(--bg); }
+      .calling-meta {
+        flex: 0 0 auto;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+      /* The collapsed "you picked this" row that replaces the search box
+         once a calling is chosen. */
+      .picked {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        padding: 0.5rem 0.6rem 0.5rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+      .picked-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        min-width: 0;
+      }
+      .picked-name { font-weight: 500; }
+      .picked-meta { font-size: 0.75rem; color: var(--muted); }
       .candidate-list {
         /* No internal scroll here - a capped-height, independently
            scrolling list nested inside the page's own scroll reads as
@@ -579,6 +702,61 @@ export class NewCallingComponent {
       options: g.options.map((c) => ({ name: c })),
     }));
   });
+
+  protected readonly callingQuery = signal('');
+
+  /** displayedCallingGroups narrowed by the calling search box, with the
+   *  groups that lost every option dropped. An empty query matches
+   *  everything, so the picker stays browsable before you type. */
+  protected readonly matchedCallingGroups = computed<CallingDropdownGroup[]>(() => {
+    const tokens = this.callingQuery().trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return this.displayedCallingGroups();
+    return this.displayedCallingGroups()
+      .map((g) => ({
+        label: g.label,
+        options: g.options.filter((o) => callingMatches(o.name, g.label, tokens)),
+      }))
+      .filter((g) => g.options.length > 0);
+  });
+
+  protected readonly matchedCallingCount = computed(() =>
+    this.matchedCallingGroups().reduce((n, g) => n + g.options.length, 0),
+  );
+
+  /** matchedCallingGroups truncated to CALLING_RESULTS_LIMIT options in
+   *  total (not per group), so the rendered list stays a screenful. */
+  protected readonly searchedCallingGroups = computed<CallingDropdownGroup[]>(() => {
+    const out: CallingDropdownGroup[] = [];
+    let remaining = CALLING_RESULTS_LIMIT;
+    for (const g of this.matchedCallingGroups()) {
+      if (remaining <= 0) break;
+      const options = g.options.slice(0, remaining);
+      remaining -= options.length;
+      out.push({ label: g.label, options });
+    }
+    return out;
+  });
+
+  protected readonly shownCallingCount = computed(() =>
+    this.searchedCallingGroups().reduce((n, g) => n + g.options.length, 0),
+  );
+
+  /** Group label for the currently-picked calling, shown under its name in
+   *  the collapsed picker so "Ward Clerk" vs "Stake Clerk" stays legible. */
+  protected readonly selectedCallingGroup = computed(() => {
+    const name = this.callingName();
+    if (!name) return '';
+    return CALLING_GROUPS.find((g) => g.options.includes(name))?.label ?? '';
+  });
+
+  protected selectCalling(name: string): void {
+    this.callingName.set(name);
+    this.callingQuery.set('');
+  }
+
+  protected clearCalling(): void {
+    this.callingName.set('');
+  }
 
   /** Which filters are currently narrowing the person list — used in
    *  the hint sentence beneath the dropdown. */

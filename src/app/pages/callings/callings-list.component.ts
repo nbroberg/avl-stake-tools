@@ -6,7 +6,7 @@ import { switchMap, tap } from 'rxjs';
 import { CallingsService } from '../../core/callings.service';
 import { estimateInitialPageSize } from '../../core/page-size';
 import { canCreateWorkflow } from '../../core/roles';
-import { workflowScopeLabel } from '../../core/units';
+import { unitLabel, workflowScopeLabel } from '../../core/units';
 import { callingAwaitsResponseFrom } from '../../core/hc-vote';
 import { AuthService } from '../../core/auth.service';
 import { LoadMoreSentinelDirective } from '../../shared/load-more-sentinel.directive';
@@ -71,6 +71,16 @@ function labelFor(w: CallingWorkflow): string {
         padding: 0.3rem 0.75rem;
         font-size: 0.85rem;
       }
+      /* Two side-by-side selects on a phone, each free to wrap to its own
+         line once the labels no longer fit. */
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+      .filters .field {
+        flex: 1 1 10rem;
+      }
       /* Whole-card shading so a calling vs. a release reads at a glance,
          not just from the small text label in the subtitle line. */
       .list-item.type-calling {
@@ -110,6 +120,34 @@ function labelFor(w: CallingWorkflow): string {
         </div>
       }
 
+      <div class="filters">
+        <div class="field">
+          <label for="type-filter">Type</label>
+          <select
+            id="type-filter"
+            [ngModel]="typeFilter()"
+            (ngModelChange)="typeFilter.set($event)"
+          >
+            <option value="all">Callings &amp; releases</option>
+            <option value="calling">Callings only</option>
+            <option value="release">Releases only</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="unit-filter">Unit</label>
+          <select
+            id="unit-filter"
+            [ngModel]="unitFilter()"
+            (ngModelChange)="unitFilter.set($event)"
+          >
+            <option value="all">All units</option>
+            @for (u of unitOptions(); track u.value) {
+              <option [value]="u.value">{{ u.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
       <label class="row text-sm muted" style="gap: 0.5rem; min-height: var(--tap)">
         <input
           type="checkbox"
@@ -124,7 +162,13 @@ function labelFor(w: CallingWorkflow): string {
       } @else {
         @if (visible().length === 0) {
           <p class="muted">
-            {{ onlyAwaiting() ? 'Nothing is waiting on you right now.' : 'No workflows yet.' }}
+            @if (onlyAwaiting()) {
+              Nothing is waiting on you right now.
+            } @else if (filtersActive()) {
+              Nothing matches these filters.
+            } @else {
+              No workflows yet.
+            }
           </p>
         }
 
@@ -165,6 +209,9 @@ export class CallingsListComponent {
   protected readonly workflowScopeLabel = workflowScopeLabel;
   protected readonly showComplete = signal(false);
   protected readonly onlyAwaiting = signal(false);
+  protected readonly typeFilter = signal<'all' | CallingWorkflow['workflowType']>('all');
+  /** 'all', 'stake' (workflows with no unit), or a unit number. */
+  protected readonly unitFilter = signal<string>('all');
 
   private readonly callingsService = inject(CallingsService);
   protected readonly pageSize = signal(estimateInitialPageSize(ROW_HEIGHT_PX));
@@ -208,11 +255,43 @@ export class CallingsListComponent {
 
   protected readonly awaitingCount = computed(() => this.awaitingMine().length);
 
+  /**
+   * Unit choices, derived from the workflows actually loaded rather than
+   * from the whole stakeUnits() vocabulary, so the dropdown never offers a
+   * unit that would filter the list to nothing. "Stake" leads because a
+   * stake-level workflow is the one with no unit at all.
+   */
+  protected readonly unitOptions = computed(() => {
+    const seen = new Set<string>();
+    for (const w of this.workflows() ?? []) seen.add(w.unit ?? '');
+    const units = [...seen]
+      .filter(Boolean)
+      .map((n) => ({ value: n, label: unitLabel(n) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return seen.has('') ? [{ value: 'stake', label: 'Stake' }, ...units] : units;
+  });
+
+  protected readonly filtersActive = computed(
+    () => this.typeFilter() !== 'all' || this.unitFilter() !== 'all',
+  );
+
   protected readonly visible = computed(() => {
     const items = this.workflows();
     if (!items) return [];
-    if (this.onlyAwaiting()) return this.awaitingMine();
-    return this.showComplete() ? items : items.filter((w) => w.status !== 'complete');
+    const base = this.onlyAwaiting()
+      ? this.awaitingMine()
+      : this.showComplete()
+        ? items
+        : items.filter((w) => w.status !== 'complete');
+    const type = this.typeFilter();
+    const unit = this.unitFilter();
+    if (type === 'all' && unit === 'all') return base;
+    return base.filter((w) => {
+      if (type !== 'all' && w.workflowType !== type) return false;
+      if (unit === 'stake') return !w.unit;
+      if (unit !== 'all') return w.unit === unit;
+      return true;
+    });
   });
 
   protected awaitsMe(w: CallingWorkflow): boolean {
