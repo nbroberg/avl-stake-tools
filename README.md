@@ -536,14 +536,22 @@ deploying to a user/org root page or a custom domain, edit the
   point against `public/boundaries/units.geojson` using
   `@turf/boolean-point-in-polygon` (matching logic itself is the pure
   `matchUnit` in
-  [boundary-match.ts](src/app/core/boundary-match.ts), tested in
-  [tests/boundaryMatch.test.ts](tests/boundaryMatch.test.ts)). Nothing
+  [boundary-match.ts](src/app/core/boundary-match.ts), tested against
+  both a synthetic fixture
+  ([tests/boundaryMatch.test.ts](tests/boundaryMatch.test.ts)) and the
+  real published file
+  ([tests/boundaryData.test.ts](tests/boundaryData.test.ts))). Nothing
   about a lookup is persisted — not the address, not the resolved
-  coordinates, not a history of requests. **The shipped
-  `units.geojson` is placeholder data** (obviously so — its unit names
-  say "placeholder"); see
-  [public/boundaries/README.md](public/boundaries/README.md) for the
-  real KML/KMZ → GeoJSON → deploy pipeline. Because production has
+  coordinates, not a history of requests. **`units.geojson` currently
+  covers only 6 of the stake's 11 units** — an address in one of the
+  other 5 (Cherokee Ward, Marion Ward, Waynesville Ward, Franklin
+  Branch, Hendersonville 2nd Branch) reports "outside the stake,"
+  which is wrong, not just incomplete; see
+  [public/boundaries/README.md](public/boundaries/README.md) for
+  exactly what's covered, where the data came from, and the KML/KMZ →
+  GeoJSON → deploy pipeline for finishing it (Hendersonville 2nd
+  Branch needs a design decision first, not just a polygon — also
+  covered there). Because production has
   been sitting behind the maintenance redirect in `src/index.html`,
   that redirect's script also explicitly exempts `/boundary` (and
   `/demo/boundary`) so this page keeps working regardless of whether
