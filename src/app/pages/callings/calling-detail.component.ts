@@ -465,7 +465,7 @@ function displayStatusLabel(w: CallingWorkflow): string {
                 [disabled]="busy() || (s === 'interview_assigned' && !pendingAssignee().trim())"
                 (click)="advance(s)"
               >
-                Mark: {{ labelsFor(w)[s] ?? s }}
+                Mark: {{ labelsFor(w)[s] ?? s }}{{ s === 'sustained' ? ' in ' + unitLabel(w.unit) : '' }}
               </button>
             </div>
           } @else if (!canAdvance(w.status, s)) {
