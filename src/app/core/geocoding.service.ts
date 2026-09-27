@@ -28,11 +28,14 @@ export class GeocodingError extends Error {
  * Turns a street address into coordinates via the Google Geocoding API,
  * called directly from the browser (no Firestore, no backend - see
  * pages/boundary/boundary-lookup.component.ts, the only page that uses
- * this). The API key is a public, domain-restricted key baked into the
- * client bundle same as the Firebase config is; see .env.example for
- * the restriction it needs on Google's side. Nothing here persists the
- * address anywhere - it's forwarded to Google's endpoint and the
- * response is handed back, full stop.
+ * this). The API key is baked into the client bundle same as the
+ * Firebase config is - but unlike that config, it can't be locked to
+ * this domain: Google's Geocoding "Web Service" REST API rejects a key
+ * with an HTTP referrer restriction outright. See .env.example for
+ * what's actually possible to restrict it with (API restriction + a
+ * daily quota - not domain-bound). Nothing here persists the address
+ * anywhere - it's forwarded to Google's endpoint and the response is
+ * handed back, full stop.
  */
 @Injectable({ providedIn: 'root' })
 export class GeocodingService {

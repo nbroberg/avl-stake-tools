@@ -530,8 +530,10 @@ deploying to a user/org root page or a custom domain, edit the
   page — no Google sign-in, no Firestore, listed explicitly among the
   routes `app.routes.ts` keeps outside `authGuard`. A member types an
   address, [geocoding.service.ts](src/app/core/geocoding.service.ts)
-  resolves it to coordinates via the Google Geocoding API (a public,
-  domain-restricted key — see `.env.example`), and
+  resolves it to coordinates via the Google Geocoding API (a public
+  key restricted to that one API + a daily quota — **not** to this
+  domain, since Google's Geocoding REST API rejects a key with an HTTP
+  referrer restriction; see `.env.example`), and
   [boundary.service.ts](src/app/core/boundary.service.ts) matches the
   point against `public/boundaries/units.geojson` using
   `@turf/boolean-point-in-polygon` (matching logic itself is the pure
