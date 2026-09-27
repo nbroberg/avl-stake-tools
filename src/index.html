@@ -11,6 +11,60 @@
     <meta name="format-detection" content="telephone=no" />
   </head>
   <body>
+    <!-- TEMPORARY MAINTENANCE REDIRECT — delete this <div> and <script>
+         block (only) to re-enable the app. Renders before Angular boots
+         and covers the full viewport, so the app underneath never
+         becomes visible or interactive while this is in place. -->
+    <div
+      id="maintenance-overlay"
+      style="
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        background: #1c3f60;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        font-family: system-ui, sans-serif;
+      "
+    >
+      <div>
+        <h1 style="margin: 0 0 12px; font-size: 1.5rem">
+          Stake Presidency Tools is temporarily unavailable
+        </h1>
+        <p style="margin: 0 0 8px">
+          Redirecting to the interim spreadsheet in
+          <span id="maintenance-countdown">15</span> seconds…
+        </p>
+        <p style="margin: 0">
+          <a
+            href="https://docs.google.com/spreadsheets/d/1TTygmYc4C-dVGWTlV6ThN7JyPexnczshQib_0iJKP2M/edit?usp=drivesdk"
+            style="color: #9cc7ff"
+          >
+            Go there now
+          </a>
+        </p>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var seconds = 15;
+        var target =
+          'https://docs.google.com/spreadsheets/d/1TTygmYc4C-dVGWTlV6ThN7JyPexnczshQib_0iJKP2M/edit?usp=drivesdk';
+        var countdownEl = document.getElementById('maintenance-countdown');
+        var timer = setInterval(function () {
+          seconds -= 1;
+          if (countdownEl) countdownEl.textContent = String(seconds);
+          if (seconds <= 0) {
+            clearInterval(timer);
+            window.location.replace(target);
+          }
+        }, 1000);
+      })();
+    </script>
     <app-root></app-root>
   </body>
 </html>
