@@ -161,9 +161,13 @@ type LookupState =
 
             <p class="text-sm muted" style="margin: 0">
               This is a temporary tool provided by the Asheville North Carolina Stake to bridge
-              the gap until the Church's official Meetinghouse Locator reflects these new ward
-              boundaries. Official Church records remain authoritative. If this doesn't look
-              right, please contact your bishop, branch president, or the stake presidency.
+              the gap until the Church's official
+              <a [href]="meetinghouseLocatorUrl" target="_blank" rel="noopener"
+                >Meetinghouse Locator</a
+              >
+              reflects these new ward boundaries. Official Church records remain authoritative.
+              If this doesn't look right, please contact your bishop, branch president, or the
+              stake presidency.
             </p>
           } @else if (s.kind === 'not-found') {
             <div class="card stack" style="background: var(--bg)">
