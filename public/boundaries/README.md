@@ -31,12 +31,12 @@ the way to tell a rename from a genuinely different area.
 - Waynesville Ward
 - Franklin Branch
 
-Plus **Hendersonville 2nd Branch**, which is *not* a geographic unit —
+Plus **Hendersonville 2nd Ward**, which is *not* a geographic unit —
 see below.
 
-## Hendersonville 2nd Branch: a stake-wide option, not an area
+## Hendersonville 2nd Ward: a stake-wide option, not an area
 
-Hendersonville 2nd Branch is a Pohnpeian-language congregation with no
+Hendersonville 2nd Ward is a Pohnpeian-language congregation with no
 exclusive geographic area — a member's assignment there doesn't depend
 on their address the way it does for the other 10 units, so it can't
 be represented as a polygon to test a point against. In
@@ -52,7 +52,7 @@ the GeoJSON spec, RFC 7946 §3.2) and `"properties": { ...,
   someone later gives one an actual geometry by mistake.
 - Whenever a primary (geographic) match **is** found, every
   `isStakeWideOption` feature is appended after it, unconditionally —
-  so `/boundary` always shows Hendersonville 2nd Branch as a second
+  so `/boundary` always shows Hendersonville 2nd Ward as a second
   option below whichever ward/branch geography actually matched.
 - If **no** geographic unit matches (the point is outside the stake),
   the result is `[]` — nothing is shown, not even the stake-wide
@@ -73,7 +73,7 @@ Converted from a KML export (10 `<Placemark>` elements, one closed
 one-off Python script: parse each Placemark, drop the KML altitude
 value from every `lon,lat,alt` coordinate triple, normalize each ring
 to counter-clockwise winding, slugify the name into `unitId`.
-Hendersonville 2nd Branch was appended by hand as the `geometry: null`
+Hendersonville 2nd Ward was appended by hand as the `geometry: null`
 stake-wide-option feature described above — it has no Placemark of its
 own in the KML. No `meetingTime`/`meetinghouseName`/
 `meetinghouseAddress` were in the source for any of the 11 units, so
@@ -85,13 +85,13 @@ needed if/when they're added).
 Validated three ways before publishing:
 - Each geographic unit's own centroid (average vertex position)
   resolves back to that same unit via the real `matchUnits` code path,
-  with Hendersonville 2nd Branch appended after it — codified as the
+  with Hendersonville 2nd Ward appended after it — codified as the
   `it.each` block in `tests/boundaryData.test.ts`.
 - A ~1km-spaced grid (26,559 points) across the 10 geographic units'
   combined bounding box found zero points matching more than one
   polygon.
 - A point far outside the stake resolves to `[]`, not to
-  Hendersonville 2nd Branch on its own.
+  Hendersonville 2nd Ward on its own.
 
 None of these replace real address-level validation (see below) before
 the *next* update — they only confirm this particular file parses
@@ -109,7 +109,7 @@ cleanly and its geographic polygons don't overlap each other.
    `properties`, and a `Polygon` or `MultiPolygon` geometry. Optional
    properties: `meetingTime`, `meetinghouseName`,
    `meetinghouseAddress`. A unit with no exclusive area of its own
-   (like Hendersonville 2nd Branch) instead gets `geometry: null` and
+   (like Hendersonville 2nd Ward) instead gets `geometry: null` and
    `isStakeWideOption: true` — see above.
 4. Validate before replacing the live file — see "Validation" below.
 5. Replace this `units.geojson`, update `tests/boundaryData.test.ts`

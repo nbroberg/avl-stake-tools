@@ -113,11 +113,11 @@ type LookupState =
             @for (alt of stakeWideOptions(s.units); track alt.unitId) {
               <div class="card stack" style="background: var(--bg)">
                 <div>
+                  <h3 style="margin: 0 0 0.1rem">{{ alt.unitName }}</h3>
                   <p class="text-sm muted" style="margin: 0">
-                    Also available to any member in the stake — a Pohnpeian-language
-                    congregation:
+                    This congregation is intended for Pohnpeian speakers living anywhere within
+                    the stake boundaries.
                   </p>
-                  <h3 style="margin: 0.1rem 0 0">{{ alt.unitName }}</h3>
                 </div>
                 @if (alt.meetingTime || alt.meetinghouseAddress) {
                   <div class="text-sm">

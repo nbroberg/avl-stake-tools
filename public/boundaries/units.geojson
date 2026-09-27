@@ -66348,8 +66348,8 @@
     {
       "type": "Feature",
       "properties": {
-        "unitName": "Hendersonville 2nd Branch",
-        "unitId": "hendersonville-2nd-branch",
+        "unitName": "Hendersonville 2nd Ward",
+        "unitId": "hendersonville-2nd-ward",
         "isStakeWideOption": true
       },
       "geometry": null

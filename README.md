@@ -543,7 +543,7 @@ deploying to a user/org root page or a custom domain, edit the
   ([tests/boundaryData.test.ts](tests/boundaryData.test.ts))). Nothing
   about a lookup is persisted — not the address, not the resolved
   coordinates, not a history of requests. **`units.geojson` covers all
-  11 units** — 10 as ordinary polygons, plus Hendersonville 2nd Branch
+  11 units** — 10 as ordinary polygons, plus Hendersonville 2nd Ward
   (a Pohnpeian-language congregation with no exclusive area of its own)
   represented as a `geometry: null` "stake-wide option" that
   `matchUnits` appends after whichever geographic unit matches,

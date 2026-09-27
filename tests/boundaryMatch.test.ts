@@ -5,8 +5,8 @@ import type { FeatureCollection } from 'geojson';
 // Two adjacent, non-overlapping 0.05°-square units sharing the
 // longitude -82.55 boundary line, a MultiPolygon unit further away,
 // and a stake-wide option with no geometry of its own (mirrors
-// Hendersonville 2nd Branch in the real data - a foreign-language
-// branch open to any member in the stake, not tied to an area) -
+// Hendersonville 2nd Ward in the real data - a foreign-language
+// congregation open to any member in the stake, not tied to an area) -
 // enough to exercise every branch of matchUnits without needing real
 // boundary data (see public/boundaries/README.md for the real
 // pipeline).

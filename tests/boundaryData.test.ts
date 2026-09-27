@@ -31,13 +31,13 @@ const EXPECTED_UNIT_CENTROIDS: Record<string, [latitude: number, longitude: numb
   'Franklin Branch': [35.1615, -83.5028],
 };
 
-// Hendersonville 2nd Branch is a foreign-language congregation with no
+// Hendersonville 2nd Ward is a foreign-language congregation with no
 // exclusive geographic area of its own (see public/boundaries/README.md)
 // - represented with a null geometry and isStakeWideOption: true, so it
 // never wins the primary point-in-polygon search and instead gets
 // appended after whichever geographic unit does match, for every point
 // inside the stake.
-const STAKE_WIDE_OPTION_NAME = 'Hendersonville 2nd Branch';
+const STAKE_WIDE_OPTION_NAME = 'Hendersonville 2nd Ward';
 
 function loadRealBoundaries(): FeatureCollection {
   return JSON.parse(readFileSync(GEOJSON_PATH, 'utf8')) as FeatureCollection;
@@ -52,7 +52,7 @@ describe('public/boundaries/units.geojson (real data)', () => {
     expect(names).toEqual(expected);
   });
 
-  it('Hendersonville 2nd Branch is a stake-wide option, not a geographic unit', () => {
+  it('Hendersonville 2nd Ward is a stake-wide option, not a geographic unit', () => {
     const fc = loadRealBoundaries();
     const feature = fc.features.find((f) => f.properties?.['unitName'] === STAKE_WIDE_OPTION_NAME);
     expect(feature?.properties?.['isStakeWideOption']).toBe(true);

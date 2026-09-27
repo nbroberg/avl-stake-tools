@@ -55,7 +55,7 @@ function toUnitBoundary(properties: GeoJsonProperties): UnitBoundary {
  * option for anyone in the stake, not something to point-in-polygon
  * test, so those features are excluded from the geographic search
  * entirely (regardless of whether they even carry a geometry - the
- * shipped data gives Hendersonville 2nd Branch a null one, valid per
+ * shipped data gives Hendersonville 2nd Ward a null one, valid per
  * GeoJSON's own spec for a feature with no geometry) and instead
  * appended straight through whenever a geographic match was found.
  * A feature with neither a Polygon/MultiPolygon geometry nor
