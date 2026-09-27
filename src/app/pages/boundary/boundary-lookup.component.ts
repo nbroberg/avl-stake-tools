@@ -5,6 +5,24 @@ import { GeocodingService, GeocodingError, type Coordinates } from '../../core/g
 
 const MEETINGHOUSE_LOCATOR_URL = 'https://maps.churchofjesuschrist.org/';
 
+/**
+ * "Use My Current Location" is temporarily withheld: most people
+ * trying this over the stake conference weekend (Sun 2026-09-27) are
+ * doing so from the same building, which usually isn't their home
+ * address's unit - "current location" would give a systematically
+ * wrong answer for nearly everyone using it that way, worse than not
+ * offering it at all. Address entry is unaffected.
+ *
+ * Re-enables itself automatically at the cutoff below rather than
+ * needing a follow-up redeploy Monday - a static site has no
+ * server-side clock to gate on, so this checks the viewer's own
+ * device clock instead (safe to assume close enough to correct for
+ * this purpose). Remove this constant and the `geolocationAvailable`
+ * gate below (going back to `supportsGeolocation` alone) once it's no
+ * longer needed.
+ */
+const GEOLOCATION_REENABLE_AT = Date.parse('2026-09-28T10:00:00Z'); // Monday 6:00 AM US Eastern (EDT, UTC-4)
+
 type LookupState =
   | { kind: 'idle' }
   | { kind: 'loading' }
@@ -68,7 +86,7 @@ type LookupState =
           >
             Find My Unit
           </button>
-          @if (supportsGeolocation) {
+          @if (geolocationAvailable) {
             <button
               type="button"
               class="btn btn-responsive"
@@ -184,6 +202,8 @@ export class BoundaryLookupComponent {
   protected readonly meetinghouseLocatorUrl = MEETINGHOUSE_LOCATOR_URL;
   protected readonly supportsGeolocation =
     typeof navigator !== 'undefined' && 'geolocation' in navigator;
+  protected readonly geolocationAvailable =
+    this.supportsGeolocation && Date.now() >= GEOLOCATION_REENABLE_AT;
 
   protected readonly address = signal('');
   protected readonly state = signal<LookupState>({ kind: 'idle' });
@@ -210,7 +230,7 @@ export class BoundaryLookupComponent {
   }
 
   useMyLocation(): void {
-    if (this.busy() || !this.supportsGeolocation) return;
+    if (this.busy() || !this.geolocationAvailable) return;
     this.state.set({ kind: 'loading' });
     navigator.geolocation.getCurrentPosition(
       (position) =>
