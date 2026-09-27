@@ -13,7 +13,7 @@ describe('parseLcrRoster', () => {
   it('parses a well-formed row and derives the id from name + birth year', () => {
     const out = parseLcrRoster(
       tsv(
-        'Smith, John Andrew\t1970\tAsheville Ward\t(555) 555-0000\tSmith, John\t' +
+        'Smith, John Andrew\t1970\tFrench Broad Ward\t(555) 555-0000\tSmith, John\t' +
           'sample@example.com\tStake Clerk (15 Jun 2025)\tElder',
       ),
     );
@@ -25,7 +25,7 @@ describe('parseLcrRoster', () => {
       displayName: 'John Smith',
       birthYear: 1970,
       unit: '139173',
-      unitName: 'Asheville Ward',
+      unitName: 'French Broad Ward',
       callings: ['Stake Clerk'],
       sustainedAt: { 'Stake Clerk': '2025-06-15' },
       email: 'sample@example.com',
@@ -40,7 +40,7 @@ describe('parseLcrRoster', () => {
     // data (typically a woman), distinct from the column being absent.
     const out = parseLcrRoster(
       tsv(
-        'Doe, Jane\t1985\tAsheville Ward\t\t\t\t' +
+        'Doe, Jane\t1985\tFrench Broad Ward\t\t\t\t' +
           'Stake Relief Society President (1 Jan 2024)\t',
       ),
     );
@@ -55,7 +55,7 @@ describe('parseLcrRoster', () => {
     const raw =
       header +
       '\n' +
-      'Smith, John\t1970\tAsheville Ward\tJohn\tjohn@example.com\t555-0000\tBishop';
+      'Smith, John\t1970\tFrench Broad Ward\tJohn\tjohn@example.com\t555-0000\tBishop';
     const out = parseLcrRoster(raw);
     expect(out.rows).toHaveLength(1);
     expect(out.rows[0].priesthoodOffice).toBeUndefined();
@@ -63,7 +63,7 @@ describe('parseLcrRoster', () => {
 
   it('falls back to Full Name when Preferred Name is empty', () => {
     const out = parseLcrRoster(
-      tsv('Smith, John\t1970\tAsheville Ward\t\t\tjohn@example.com\tBishop\t'),
+      tsv('Smith, John\t1970\tFrench Broad Ward\t\t\tjohn@example.com\tBishop\t'),
     );
     expect(out.rows[0].displayName).toBe('John Smith');
   });
@@ -71,7 +71,7 @@ describe('parseLcrRoster', () => {
   it('captures sustained dates per calling and pairs them correctly', () => {
     const out = parseLcrRoster(
       tsv(
-        'Doe, Jane\t1985\tAsheville Ward\t\t\t\t' +
+        'Doe, Jane\t1985\tFrench Broad Ward\t\t\t\t' +
           'Elders Quorum First Counselor (1 Jan 2024) Bishop (5 Mar 2026)\t',
       ),
     );
@@ -92,8 +92,8 @@ describe('parseLcrRoster', () => {
     // picker - can see everyone, not just calling holders.
     const out = parseLcrRoster(
       tsv(
-        'Doe, Jane\t1985\tAsheville Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
-        'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop (5 Mar 2026)\t',
+        'Doe, Jane\t1985\tFrench Broad Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
+        'Smith, John\t1970\tFrench Broad Ward\t\t\t\tBishop (5 Mar 2026)\t',
       ),
     );
     expect(out.rows).toHaveLength(2);
@@ -108,10 +108,10 @@ describe('parseLcrRoster', () => {
     const out = parseLcrRoster(
       tsv(
         // Out-of-scope only: callings stays empty, allCallings doesn't.
-        'Doe, Jane\t1985\tAsheville Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
+        'Doe, Jane\t1985\tFrench Broad Ward\t\t\t\tPrimary Teacher (1 Jan 2024)\t',
         // Mixed: both land in allCallings; only Bishop is canonicalized
         // into callings.
-        'Smith, John\t1970\tAsheville Ward\t\t\t\t' +
+        'Smith, John\t1970\tFrench Broad Ward\t\t\t\t' +
           'Ward Missionary (2 Feb 2024) Bishop (5 Mar 2026)\t',
       ),
     );
@@ -123,7 +123,7 @@ describe('parseLcrRoster', () => {
 
   it('reports missing Birth Year', () => {
     const out = parseLcrRoster(
-      tsv('Doe, Jane\t\tAsheville Ward\t\t\t\tBishop\t'),
+      tsv('Doe, Jane\t\tFrench Broad Ward\t\t\t\tBishop\t'),
     );
     expect(out.rows).toHaveLength(0);
     expect(out.errors[0].message).toMatch(/birth year/i);
@@ -148,8 +148,8 @@ describe('parseLcrRoster', () => {
   it('detects duplicate ids within a single paste', () => {
     const out = parseLcrRoster(
       tsv(
-        'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop\t',
-        'Smith, John\t1970\tAsheville Ward\t\t\t\tElders Quorum President\t',
+        'Smith, John\t1970\tFrench Broad Ward\t\t\t\tBishop\t',
+        'Smith, John\t1970\tFrench Broad Ward\t\t\t\tElders Quorum President\t',
       ),
     );
     expect(out.rows).toHaveLength(1);
@@ -159,7 +159,7 @@ describe('parseLcrRoster', () => {
   it('ignores the trailing "Count:" line', () => {
     const out = parseLcrRoster(
       tsv(
-        'Smith, John\t1970\tAsheville Ward\t\t\t\tBishop\t',
+        'Smith, John\t1970\tFrench Broad Ward\t\t\t\tBishop\t',
         'Count: 155\t\t\t\t\t\t\t',
       ),
     );
@@ -169,7 +169,7 @@ describe('parseLcrRoster', () => {
 
   it('drops accents in slugs so accented names still produce ASCII ids', () => {
     const out = parseLcrRoster(
-      tsv('García, María\t1990\tAsheville Ward\t\t\t\tBishop\t'),
+      tsv('García, María\t1990\tFrench Broad Ward\t\t\t\tBishop\t'),
     );
     expect(out.rows[0].id).toBe('maria-garcia-1990');
   });
@@ -182,7 +182,7 @@ describe('parseLcrRoster', () => {
     const raw =
       header +
       '\n' +
-      'Smith, John\t1970\tAsheville Ward\tJohn\tjohn@example.com\t555-0000\tBishop';
+      'Smith, John\t1970\tFrench Broad Ward\tJohn\tjohn@example.com\t555-0000\tBishop';
     const out = parseLcrRoster(raw);
     expect(out.rows).toHaveLength(1);
     expect(out.rows[0].callings).toEqual(['Bishop']);

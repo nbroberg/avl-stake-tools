@@ -39,28 +39,32 @@ export interface StakeUnit {
  * stakeUnits() rather than importing this constant.
  */
 const REAL_STAKE_UNITS: readonly StakeUnit[] = [
-  { number: '139173',  name: 'Asheville Ward',                          kind: 'ward'   },
+  { number: '139173',  name: 'French Broad Ward',                       kind: 'ward'   },
   { number: '49212',   name: 'Cherokee Ward',                           kind: 'ward'   },
   { number: '49921',   name: 'Forest City Ward',                        kind: 'ward'   },
   { number: '46442',   name: 'Hendersonville 1st Ward',                 kind: 'ward'   },
   { number: '49468',   name: 'Marion Ward',                             kind: 'ward'   },
   { number: '95494',   name: 'Waynesville Ward',                        kind: 'ward'   },
   { number: '156922',  name: 'Weaverville Ward',                        kind: 'ward'   },
-  // Asheville Central Branch and Hendersonville 2nd Branch are becoming
-  // wards as part of a boundary realignment - kind flipped ahead of the
-  // official reorganization so the New Calling form's Unit dropdown
-  // offers them for the incoming Bishop callings (unitScopeFor('Bishop')
-  // filters to kind: 'ward'). Names deliberately left as "...Branch" for
-  // now, matching what LCR still reports - see core/calling-authorities.ts
-  // and core/callings-vocabulary.ts, neither of which reads `kind` at
-  // all, so this flip has no effect on anything except that one dropdown.
-  { number: '193534',  name: 'Asheville Central Branch',                kind: 'ward'   },
+  // unitNumber 139173 (above) and 193534 (below) carry their POST-
+  // realignment names - "French Broad Ward" was Asheville Ward, "Cane
+  // Creek Ward" was Asheville Central Branch, same boundaries, same
+  // unit numbers, just renamed (confirmed against
+  // Asheville_Stake_Boundaries_2026.kml - see public/boundaries/README.md).
+  // Hendersonville 2nd similarly finished its branch -> ward
+  // reorganization (kind had been flipped to 'ward' ahead of that, back
+  // when the name still said "...Branch" to match what LCR reported at
+  // the time - see git history on this file for that transitional
+  // state). If LCR's own "Unit" column hasn't caught up to one
+  // of these names yet, give that unit an `lcrName` override (see
+  // StakeUnit.lcrName above) rather than reverting `name` here.
+  { number: '193534',  name: 'Cane Creek Ward',                         kind: 'ward'   },
   { number: '188840',  name: 'Brevard Branch',                          kind: 'branch' },
   { number: '95486',   name: 'Franklin Branch',                         kind: 'branch' },
   {
     number: '1906070',
-    name: 'Hendersonville 2nd Branch',
-    lcrName: 'Hendersonville 2nd Branch (Pohnpeian)',
+    name: 'Hendersonville 2nd Ward',
+    lcrName: 'Hendersonville 2nd Ward (Pohnpeian)',
     kind: 'ward',
   },
 ];
