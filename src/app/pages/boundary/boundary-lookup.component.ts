@@ -114,7 +114,7 @@ type LookupState =
               <div class="card stack" style="background: var(--bg)">
                 <div>
                   <p class="text-sm muted" style="margin: 0">
-                    Also available to any member in the stake — a foreign-language
+                    Also available to any member in the stake — a Pohnpeian-language
                     congregation:
                   </p>
                   <h3 style="margin: 0.1rem 0 0">{{ alt.unitName }}</h3>

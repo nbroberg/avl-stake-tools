@@ -544,7 +544,7 @@ deploying to a user/org root page or a custom domain, edit the
   about a lookup is persisted — not the address, not the resolved
   coordinates, not a history of requests. **`units.geojson` covers all
   11 units** — 10 as ordinary polygons, plus Hendersonville 2nd Branch
-  (a foreign-language congregation with no exclusive area of its own)
+  (a Pohnpeian-language congregation with no exclusive area of its own)
   represented as a `geometry: null` "stake-wide option" that
   `matchUnits` appends after whichever geographic unit matches,
   unconditionally, and omits entirely for an address outside the

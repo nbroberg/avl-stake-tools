@@ -36,7 +36,7 @@ see below.
 
 ## Hendersonville 2nd Branch: a stake-wide option, not an area
 
-Hendersonville 2nd Branch is a foreign-language congregation with no
+Hendersonville 2nd Branch is a Pohnpeian-language congregation with no
 exclusive geographic area — a member's assignment there doesn't depend
 on their address the way it does for the other 10 units, so it can't
 be represented as a polygon to test a point against. In
