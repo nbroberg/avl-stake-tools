@@ -3,6 +3,7 @@ import { authGuard } from './core/auth.guard';
 import { LoginComponent } from './auth/login.component';
 import { AccessDeniedComponent } from './auth/access-denied.component';
 import { DiagnosticsComponent } from './pages/diagnostics.component';
+import { BoundaryLookupComponent } from './pages/boundary/boundary-lookup.component';
 import { LayoutComponent } from './layout/layout.component';
 import { DashboardComponent } from './pages/dashboard.component';
 import { AssignmentsComponent } from './pages/assignments.component';
@@ -22,6 +23,10 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'access-denied', component: AccessDeniedComponent },
   { path: 'diagnostics', component: DiagnosticsComponent },
+  // Address -> ward/branch lookup for the general public - no Google
+  // sign-in, no LCR/Firestore membership data. See
+  // pages/boundary/boundary-lookup.component.ts.
+  { path: 'boundary', component: BoundaryLookupComponent },
 
   // Everything else requires an authenticated + authorized account.
   {

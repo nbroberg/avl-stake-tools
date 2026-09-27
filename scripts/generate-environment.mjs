@@ -61,6 +61,13 @@ const config = {
     appId: firebaseEnv('FIREBASE_APP_ID'),
   },
   googleAuthHd: forceDemoMode ? '' : readEnv('GOOGLE_AUTH_HD', ''),
+  // Public, domain-restricted key for the unauthenticated /boundary page
+  // (see core/geocoding.service.ts) - unlike the Firebase config above,
+  // this is deliberately NOT blanked for a demo build: the boundary page
+  // needs no sign-in and no Firestore data either way, so there's no
+  // demo-mode reason to disable it, and the key is restricted by HTTP
+  // referrer to this site regardless of which path uses it.
+  googleGeocodingApiKey: readEnv('GOOGLE_GEOCODING_API_KEY', ''),
   // Demo mode (mock data, no Firebase) is always available in a dev build.
   // This flag is what lets a PRODUCTION build offer it, so it defaults to
   // false: a normal deploy can't be talked into showing fake data.

@@ -60,8 +60,19 @@
       (function () {
         var baseTag = document.querySelector('base');
         var isDemo = !!baseTag && baseTag.getAttribute('href') === '/demo/';
+        // /boundary is a standalone public page (address -> ward/branch
+        // lookup, no sign-in) that's meant to keep working even while the
+        // rest of the app is behind this redirect - see
+        // pages/boundary/boundary-lookup.component.ts. Checked against
+        // both the root and /demo/ paths since the base tag makes the
+        // pathname prefix differ between them.
+        var isBoundaryPage =
+          window.location.pathname === '/boundary' ||
+          window.location.pathname.indexOf('/boundary/') === 0 ||
+          window.location.pathname === '/demo/boundary' ||
+          window.location.pathname.indexOf('/demo/boundary/') === 0;
         var overlay = document.getElementById('maintenance-overlay');
-        if (isDemo) {
+        if (isDemo || isBoundaryPage) {
           if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
           return;
         }

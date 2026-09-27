@@ -1,0 +1,51 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "unitName": "Sample Unit A (placeholder — replace with real boundary data)",
+        "unitId": "sample-unit-a",
+        "meetingTime": "11:30 AM",
+        "meetinghouseName": "Sample Meetinghouse",
+        "meetinghouseAddress": "3401 Sweeten Creek Road, Arden, NC"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-82.6, 35.55],
+            [-82.55, 35.55],
+            [-82.55, 35.6],
+            [-82.6, 35.6],
+            [-82.6, 35.55]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "unitName": "Sample Unit B (placeholder — replace with real boundary data)",
+        "unitId": "sample-unit-b",
+        "meetingTime": "9:00 AM",
+        "meetinghouseName": "Sample Meetinghouse",
+        "meetinghouseAddress": "3401 Sweeten Creek Road, Arden, NC"
+      },
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [
+          [
+            [
+              [-82.55, 35.55],
+              [-82.5, 35.55],
+              [-82.5, 35.6],
+              [-82.55, 35.6],
+              [-82.55, 35.55]
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
