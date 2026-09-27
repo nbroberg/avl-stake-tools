@@ -14,7 +14,14 @@
     <!-- TEMPORARY MAINTENANCE REDIRECT — delete this <div> and <script>
          block (only) to re-enable the app. Renders before Angular boots
          and covers the full viewport, so the app underneath never
-         becomes visible or interactive while this is in place. -->
+         becomes visible or interactive while this is in place.
+
+         Skipped on /demo/: the deploy workflow bakes this same
+         index.html into both the root (production) and /demo/ builds,
+         rewriting <base href> to "/demo/" for the latter (see
+         .github/workflows - `ng build --base-href "/demo/"`). Checking
+         that at runtime, rather than the URL path, survives deep links
+         like /demo/callings/<id>. -->
     <div
       id="maintenance-overlay"
       style="
@@ -51,6 +58,14 @@
     </div>
     <script>
       (function () {
+        var baseTag = document.querySelector('base');
+        var isDemo = !!baseTag && baseTag.getAttribute('href') === '/demo/';
+        var overlay = document.getElementById('maintenance-overlay');
+        if (isDemo) {
+          if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          return;
+        }
+
         var seconds = 15;
         var target =
           'https://docs.google.com/spreadsheets/d/1TTygmYc4C-dVGWTlV6ThN7JyPexnczshQib_0iJKP2M/edit?usp=drivesdk';
