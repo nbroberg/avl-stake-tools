@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import type { FeatureCollection } from 'geojson';
 import { from, map, shareReplay, type Observable } from 'rxjs';
-import { matchUnit, type UnitBoundary } from './boundary-match';
+import { matchUnits, type UnitBoundary } from './boundary-match';
 
 export type { UnitBoundary } from './boundary-match';
 
@@ -22,7 +22,7 @@ const BOUNDARIES_URL = 'boundaries/units.geojson';
  * be wasteful. Swapping in new boundaries is a matter of replacing that
  * file and redeploying; nothing here changes.
  *
- * The actual point-in-polygon matching is the pure `matchUnit` function
+ * The actual point-in-polygon matching is the pure `matchUnits` function
  * in boundary-match.ts, kept separate so it can be unit-tested without
  * Angular or a network fetch.
  */
@@ -45,9 +45,11 @@ export class BoundaryService {
     return (await response.json()) as FeatureCollection;
   }
 
-  /** The unit whose polygon contains this point, or null if it falls
-   *  outside every loaded boundary. */
-  findUnit(latitude: number, longitude: number): Observable<UnitBoundary | null> {
-    return this.loadBoundaries().pipe(map((fc) => matchUnit(fc, latitude, longitude)));
+  /** The geographic unit whose polygon contains this point, followed by
+   *  every stake-wide option (a foreign-language branch, say) - or `[]`
+   *  if the point falls outside every geographic boundary. See
+   *  `matchUnits` for the full rule. */
+  findUnits(latitude: number, longitude: number): Observable<UnitBoundary[]> {
+    return this.loadBoundaries().pipe(map((fc) => matchUnits(fc, latitude, longitude)));
   }
 }

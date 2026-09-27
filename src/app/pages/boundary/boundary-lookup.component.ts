@@ -8,7 +8,10 @@ const MEETINGHOUSE_LOCATOR_URL = 'https://maps.churchofjesuschrist.org/';
 type LookupState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'result'; unit: UnitBoundary }
+  // units[0] is the geographic match (whose polygon contains the point);
+  // units[1..] are stake-wide options (e.g. a foreign-language branch)
+  // appended unconditionally alongside it - see BoundaryService.findUnits.
+  | { kind: 'result'; units: UnitBoundary[] }
   | { kind: 'not-found' }
   | { kind: 'outside-stake' }
   | { kind: 'error'; message: string };
@@ -84,28 +87,60 @@ type LookupState =
             <div class="card stack" style="background: var(--bg)">
               <div>
                 <p class="text-sm muted" style="margin: 0">Your unit is:</p>
-                <h2 style="margin: 0.1rem 0 0">{{ s.unit.unitName }}</h2>
+                <h2 style="margin: 0.1rem 0 0">{{ s.units[0].unitName }}</h2>
               </div>
-              @if (s.unit.meetingTime || s.unit.meetinghouseAddress) {
+              @if (s.units[0].meetingTime || s.units[0].meetinghouseAddress) {
                 <div class="text-sm">
-                  @if (s.unit.meetingTime) {
-                    <p style="margin: 0">Sunday: {{ s.unit.meetingTime }}</p>
+                  @if (s.units[0].meetingTime) {
+                    <p style="margin: 0">Sunday: {{ s.units[0].meetingTime }}</p>
                   }
-                  @if (s.unit.meetinghouseName || s.unit.meetinghouseAddress) {
+                  @if (s.units[0].meetinghouseName || s.units[0].meetinghouseAddress) {
                     <p style="margin: 0">
                       Meetinghouse:
-                      {{ s.unit.meetinghouseName ? s.unit.meetinghouseName + ' — ' : '' }}
-                      {{ s.unit.meetinghouseAddress }}
+                      {{ s.units[0].meetinghouseName ? s.units[0].meetinghouseName + ' — ' : '' }}
+                      {{ s.units[0].meetinghouseAddress }}
                     </p>
                   }
                 </div>
               }
-              @if (mapsUrl(s.unit); as url) {
+              @if (mapsUrl(s.units[0]); as url) {
                 <a class="btn btn-responsive" [href]="url" target="_blank" rel="noopener">
                   View Meetinghouse in Google Maps
                 </a>
               }
             </div>
+
+            @for (alt of stakeWideOptions(s.units); track alt.unitId) {
+              <div class="card stack" style="background: var(--bg)">
+                <div>
+                  <p class="text-sm muted" style="margin: 0">
+                    Also available to any member in the stake — a foreign-language
+                    congregation:
+                  </p>
+                  <h3 style="margin: 0.1rem 0 0">{{ alt.unitName }}</h3>
+                </div>
+                @if (alt.meetingTime || alt.meetinghouseAddress) {
+                  <div class="text-sm">
+                    @if (alt.meetingTime) {
+                      <p style="margin: 0">Sunday: {{ alt.meetingTime }}</p>
+                    }
+                    @if (alt.meetinghouseName || alt.meetinghouseAddress) {
+                      <p style="margin: 0">
+                        Meetinghouse:
+                        {{ alt.meetinghouseName ? alt.meetinghouseName + ' — ' : '' }}
+                        {{ alt.meetinghouseAddress }}
+                      </p>
+                    }
+                  </div>
+                }
+                @if (mapsUrl(alt); as url) {
+                  <a class="btn btn-responsive" [href]="url" target="_blank" rel="noopener">
+                    View Meetinghouse in Google Maps
+                  </a>
+                }
+              </div>
+            }
+
             <p class="text-sm muted" style="margin: 0">
               This tool is provided by the Asheville North Carolina Stake to help members
               identify their congregation following recent boundary changes. Official Church
@@ -154,6 +189,11 @@ export class BoundaryLookupComponent {
   protected readonly state = signal<LookupState>({ kind: 'idle' });
   protected readonly busy = computed(() => this.state().kind === 'loading');
 
+  /** Everything after the primary (geographic) match - see LookupState. */
+  protected stakeWideOptions(units: UnitBoundary[]): UnitBoundary[] {
+    return units.slice(1);
+  }
+
   protected mapsUrl(unit: UnitBoundary): string | null {
     if (!unit.meetinghouseAddress) return null;
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(unit.meetinghouseAddress)}`;
@@ -189,8 +229,9 @@ export class BoundaryLookupComponent {
   }
 
   private lookUpCoordinates(coordinates: Coordinates): void {
-    this.boundaryService.findUnit(coordinates.latitude, coordinates.longitude).subscribe({
-      next: (unit) => this.state.set(unit ? { kind: 'result', unit } : { kind: 'outside-stake' }),
+    this.boundaryService.findUnits(coordinates.latitude, coordinates.longitude).subscribe({
+      next: (units) =>
+        this.state.set(units.length > 0 ? { kind: 'result', units } : { kind: 'outside-stake' }),
       error: () =>
         this.state.set({
           kind: 'error',

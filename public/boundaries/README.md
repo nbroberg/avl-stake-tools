@@ -6,98 +6,115 @@ fetched by `BoundaryService` at runtime — see
 `src/app/core/boundary.service.ts` — and nothing in the application
 code needs to change when this file changes.
 
-## Current coverage: 6 of 11 units
+## Current coverage: all 11 units
 
-`units.geojson` was converted (see "Where this came from" below) from
-a KML export covering **6 of the stake's 11 units**:
+Converted from `Asheville_Stake_Boundaries_2026.kml` (see "Where this
+came from" below), which carries the current, post-realignment names —
+notably, two units present in an earlier KML export under old names
+turned out to be the same shapes under new ones (same `unitNumber`,
+identical polygon): the unit at `unitNumber: 139173` is now **French
+Broad Ward** (was Asheville Ward), and `unitNumber: 193534` is now
+**Cane Creek Ward** (was Asheville Central Branch). If an even later
+export renames something again, checking `unitNumber` against LCR is
+the way to tell a rename from a genuinely different area.
+
+10 geographic units, each a real polygon:
 
 - Hendersonville 1st Ward
 - Forest City Ward
-- Asheville Ward
+- French Broad Ward
 - Weaverville Ward
 - Brevard Branch
-- Asheville Central Branch
-
-**Still missing — an address in any of these areas currently reports
-"outside the stake," which is wrong, not just incomplete:**
-
+- Cane Creek Ward
 - Cherokee Ward
 - Marion Ward
 - Waynesville Ward
 - Franklin Branch
-- Hendersonville 2nd Branch
 
-`tests/boundaryData.test.ts` asserts both lists against the real file
-(and will fail loudly, on purpose, the moment one of the "missing"
-names shows up in it without the test being updated) — see that file
-for what to change when one of these is added.
+Plus **Hendersonville 2nd Branch**, which is *not* a geographic unit —
+see below.
 
-**Hendersonville 2nd Branch needs a design decision, not just a
-polygon.** It was described (by whoever supplied the source KML) as
-having no boundary of its own — its assigned area *is* the whole stake
-boundary, overlapping every other unit's area rather than sitting
-alongside it. `matchUnit` returns the *first* feature whose polygon
-contains the point (see below), so if this unit is ever added as an
-ordinary feature:
-- Placed **last** in the `features` array, it only wins for a point
-  that falls inside the outer stake boundary but outside every other
-  unit's polygon (a real gap in the other 10 units' coverage, or
-  someone genuinely assigned there rather than by address) — probably
-  the right placement.
-- Placed anywhere earlier, it would swallow every address in the
-  entire stake, since its polygon contains all of them.
+## Hendersonville 2nd Branch: a stake-wide option, not an area
 
-If it turns out members are assigned to it for a non-geographic reason
-(language, singles status, etc.) rather than genuinely "whichever
-address isn't claimed by another unit," a plain point-in-polygon match
-can't represent that at all — `/boundary` would need a way to say "we
-can't determine this from your address alone; contact the stake"
-rather than silently naming a unit.
+Hendersonville 2nd Branch is a foreign-language congregation with no
+exclusive geographic area — a member's assignment there doesn't depend
+on their address the way it does for the other 10 units, so it can't
+be represented as a polygon to test a point against. In
+`units.geojson` it's a `Feature` with `"geometry": null` (valid per
+the GeoJSON spec, RFC 7946 §3.2) and `"properties": { ...,
+"isStakeWideOption": true }`.
+
+`matchUnits` (in `src/app/core/boundary-match.ts`) treats
+`isStakeWideOption` features specially:
+
+- They're **excluded from the primary point-in-polygon search** —
+  never point-tested, never returned as the geographic match, even if
+  someone later gives one an actual geometry by mistake.
+- Whenever a primary (geographic) match **is** found, every
+  `isStakeWideOption` feature is appended after it, unconditionally —
+  so `/boundary` always shows Hendersonville 2nd Branch as a second
+  option below whichever ward/branch geography actually matched.
+- If **no** geographic unit matches (the point is outside the stake),
+  the result is `[]` — nothing is shown, not even the stake-wide
+  option. Being outside the stake outweighs being open to any member
+  *in* the stake.
+
+If a future unit needs the same treatment (another language branch, a
+YSA branch not tied to an area, etc.), give it the same
+`isStakeWideOption: true` + `geometry: null` shape and it picks up
+this behavior with no other code change.
 
 ## Where this came from
 
-Converted from a KML export (6 `<Placemark>` elements, one closed
+Converted from a KML export (10 `<Placemark>` elements, one closed
 `Polygon` ring each, `<description>` carrying `unitNumber` /
 `boundaryUnitId` / `layer` — both carried through into each feature's
 `properties` as `unitNumber` / `churchBoundaryUnitId`) using a
 one-off Python script: parse each Placemark, drop the KML altitude
 value from every `lon,lat,alt` coordinate triple, normalize each ring
-to counter-clockwise winding, slugify the name into `unitId`. No
-`meetingTime`/`meetinghouseName`/`meetinghouseAddress` were in the
-source KML, so those optional properties are simply absent for all 6
-units for now (see `UnitBoundary` in `src/app/core/boundary-match.ts`
-— every field but the two names is optional, read straight through
-with no code change needed if/when they're added).
+to counter-clockwise winding, slugify the name into `unitId`.
+Hendersonville 2nd Branch was appended by hand as the `geometry: null`
+stake-wide-option feature described above — it has no Placemark of its
+own in the KML. No `meetingTime`/`meetinghouseName`/
+`meetinghouseAddress` were in the source for any of the 11 units, so
+those optional properties are simply absent for now (see
+`UnitBoundary` in `src/app/core/boundary-match.ts` — every field but
+the two names is optional, read straight through with no code change
+needed if/when they're added).
 
-Validated with two checks (not committed as scripts — one-off, run
-against whatever the next update produces):
-- Each unit's own centroid (average vertex position) resolves back to
-  that same unit via the real `matchUnit` code path — codified as the
+Validated three ways before publishing:
+- Each geographic unit's own centroid (average vertex position)
+  resolves back to that same unit via the real `matchUnits` code path,
+  with Hendersonville 2nd Branch appended after it — codified as the
   `it.each` block in `tests/boundaryData.test.ts`.
-- A ~1km-spaced grid (14,522 points) across the 6 units' combined
-  bounding box found zero points matching more than one polygon.
+- A ~1km-spaced grid (26,559 points) across the 10 geographic units'
+  combined bounding box found zero points matching more than one
+  polygon.
+- A point far outside the stake resolves to `[]`, not to
+  Hendersonville 2nd Branch on its own.
 
-Neither check replaces real address-level validation (see below)
-before the *next* update - they only confirm this particular file
-parses cleanly and its 6 polygons don't overlap each other.
+None of these replace real address-level validation (see below) before
+the *next* update — they only confirm this particular file parses
+cleanly and its geographic polygons don't overlap each other.
 
 ## Replacing/extending this file
 
-1. Obtain the current boundary KML/KMZ for each remaining unit
-   (stake/ward boundary files, as maintained by the stake clerk /
-   mapped in LCR).
+1. Obtain the current boundary KML/KMZ for each unit (stake/ward
+   boundary files, as maintained by the stake clerk / mapped in LCR).
 2. Convert to GeoJSON. Options:
    - [mapshaper.org](https://mapshaper.org) (drag-and-drop, no install)
    - `ogr2ogr -f GeoJSON out.geojson in.kml` (GDAL, if installed)
-3. Merge into one `FeatureCollection` with one `Feature` per unit, each
-   carrying at least `unitName` and `unitId` in `properties`, and a
-   `Polygon` or `MultiPolygon` geometry. Optional properties:
-   `meetingTime`, `meetinghouseName`, `meetinghouseAddress`.
+3. Merge into one `FeatureCollection` with one `Feature` per
+   geographic unit, each carrying at least `unitName` and `unitId` in
+   `properties`, and a `Polygon` or `MultiPolygon` geometry. Optional
+   properties: `meetingTime`, `meetinghouseName`,
+   `meetinghouseAddress`. A unit with no exclusive area of its own
+   (like Hendersonville 2nd Branch) instead gets `geometry: null` and
+   `isStakeWideOption: true` — see above.
 4. Validate before replacing the live file — see "Validation" below.
 5. Replace this `units.geojson`, update `tests/boundaryData.test.ts`
-   (add the new unit's centroid; remove it from the "still missing"
-   list), and deploy as usual (`git push` to `main`; see
-   `.github/workflows/deploy.yml`).
+   (its centroid map and/or the stake-wide-option name), and deploy as
+   usual (`git push` to `main`; see `.github/workflows/deploy.yml`).
 
 ## Validation
 
@@ -111,7 +128,7 @@ Before publishing new boundary data, spot-check known addresses:
 
 A quick way to sanity-check the file itself without deploying: open it
 in [geojson.io](https://geojson.io) and confirm units don't overlap and
-don't have gaps along shared boundary lines — `matchUnit` (in
+don't have gaps along shared boundary lines — `matchUnits` (in
 `boundary-match.ts`) returns the *first* feature whose polygon contains
 the point, so an accidental overlap would silently resolve to whichever
 unit happens to come first in the file.

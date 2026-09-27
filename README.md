@@ -535,23 +535,22 @@ deploying to a user/org root page or a custom domain, edit the
   [boundary.service.ts](src/app/core/boundary.service.ts) matches the
   point against `public/boundaries/units.geojson` using
   `@turf/boolean-point-in-polygon` (matching logic itself is the pure
-  `matchUnit` in
+  `matchUnits` in
   [boundary-match.ts](src/app/core/boundary-match.ts), tested against
   both a synthetic fixture
   ([tests/boundaryMatch.test.ts](tests/boundaryMatch.test.ts)) and the
   real published file
   ([tests/boundaryData.test.ts](tests/boundaryData.test.ts))). Nothing
   about a lookup is persisted — not the address, not the resolved
-  coordinates, not a history of requests. **`units.geojson` currently
-  covers only 6 of the stake's 11 units** — an address in one of the
-  other 5 (Cherokee Ward, Marion Ward, Waynesville Ward, Franklin
-  Branch, Hendersonville 2nd Branch) reports "outside the stake,"
-  which is wrong, not just incomplete; see
-  [public/boundaries/README.md](public/boundaries/README.md) for
-  exactly what's covered, where the data came from, and the KML/KMZ →
-  GeoJSON → deploy pipeline for finishing it (Hendersonville 2nd
-  Branch needs a design decision first, not just a polygon — also
-  covered there). Because production has
+  coordinates, not a history of requests. **`units.geojson` covers all
+  11 units** — 10 as ordinary polygons, plus Hendersonville 2nd Branch
+  (a foreign-language congregation with no exclusive area of its own)
+  represented as a `geometry: null` "stake-wide option" that
+  `matchUnits` appends after whichever geographic unit matches,
+  unconditionally, and omits entirely for an address outside the
+  stake; see [public/boundaries/README.md](public/boundaries/README.md)
+  for the full design and the KML/KMZ → GeoJSON → deploy pipeline for
+  future updates. Because production has
   been sitting behind the maintenance redirect in `src/index.html`,
   that redirect's script also explicitly exempts `/boundary` (and
   `/demo/boundary`) so this page keeps working regardless of whether
