@@ -142,10 +142,10 @@ type LookupState =
             }
 
             <p class="text-sm muted" style="margin: 0">
-              This tool is provided by the Asheville North Carolina Stake to help members
-              identify their congregation following recent boundary changes. Official Church
-              records remain authoritative. If this doesn't look right, please contact your
-              bishop, branch president, or the stake presidency.
+              This is a temporary tool provided by the Asheville North Carolina Stake to bridge
+              the gap until the Church's official Meetinghouse Locator reflects these new ward
+              boundaries. Official Church records remain authoritative. If this doesn't look
+              right, please contact your bishop, branch president, or the stake presidency.
             </p>
           } @else if (s.kind === 'not-found') {
             <div class="card stack" style="background: var(--bg)">
