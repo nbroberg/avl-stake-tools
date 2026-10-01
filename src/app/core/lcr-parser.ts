@@ -159,12 +159,14 @@ function parseLcrDate(s: string): string | null {
  * Teacher (1 Jan 2026)` where each parenthetical is the sustained
  * date for the calling immediately before it. Callings whose date
  * LCR omitted (plain Callings variant, or trailing calling with no
- * paren) still come through - their sustainedAt is null.
+ * paren) still come through - their sustainedAt is null. A cell with
+ * more than one calling joins them with a literal `<br/>` - stripped
+ * here so it doesn't end up glued to the next calling's text.
  */
 function splitCallingsWithDates(
   raw: string,
 ): Array<{ text: string; sustainedAt: string | null }> {
-  const parts = raw.split(/\s*(\([^)]*\))\s*/);
+  const parts = raw.replace(/<br\s*\/?>/gi, ' ').split(/\s*(\([^)]*\))\s*/);
   const out: Array<{ text: string; sustainedAt: string | null }> = [];
   for (let i = 0; i < parts.length; i += 2) {
     const text = (parts[i] ?? '').trim();
