@@ -49,31 +49,28 @@ const REAL_STAKE_UNITS: readonly StakeUnit[] = [
   // importer's unitByName() match (falls back to `name` when unset -
   // see StakeUnit.lcrName above).
   //
-  // 139173 and 193534 below carry their POST-realignment display
-  // names - "French Broad Ward" was Asheville Ward, "Cane Creek Ward"
-  // was Asheville Central Branch, same boundaries, same unit numbers,
-  // just renamed (confirmed against Asheville_Stake_Boundaries_2026.kml
-  // - see public/boundaries/README.md) - but LCR itself hasn't been
-  // updated yet, hence the `lcrName` overrides holding the old text.
-  // Drop each `lcrName` once a real LCR export shows the new name
-  // instead.
-  { number: '139173',  name: 'French Broad Ward',  lcrName: 'Asheville Ward',           kind: 'ward'   },
+  // 139173 and 193534 were renamed in the boundary realignment -
+  // "French Broad Ward" was Asheville Ward, "Cane Creek Ward" was
+  // Asheville Central Branch, same boundaries, same unit numbers
+  // (confirmed against Asheville_Stake_Boundaries_2026.kml - see
+  // public/boundaries/README.md). LCR caught up on both names as of
+  // the 2026-10-10 export, so neither needs an `lcrName` override.
+  { number: '139173',  name: 'French Broad Ward',                                        kind: 'ward'   },
   { number: '49212',   name: 'Cherokee Ward',                                           kind: 'ward'   },
   { number: '49921',   name: 'Forest City Ward',                                        kind: 'ward'   },
   { number: '46442',   name: 'Hendersonville 1st Ward',                                 kind: 'ward'   },
   { number: '49468',   name: 'Marion Ward',                                             kind: 'ward'   },
   { number: '95494',   name: 'Waynesville Ward',                                        kind: 'ward'   },
   { number: '156922',  name: 'Weaverville Ward',                                        kind: 'ward'   },
-  { number: '193534',  name: 'Cane Creek Ward',    lcrName: 'Asheville Central Branch', kind: 'ward'   },
+  { number: '193534',  name: 'Cane Creek Ward',                                          kind: 'ward'   },
   { number: '188840',  name: 'Brevard Branch',                                          kind: 'branch' },
   { number: '95486',   name: 'Franklin Branch',                                         kind: 'branch' },
   {
     number: '1906070',
     name: 'Hendersonville 2nd Ward',
-    // LCR still reports this one under its pre-reorganization branch
-    // name - display name flips to "Ward" per stake leadership's
-    // preference; lcrName stays "...Branch" until LCR itself changes.
-    lcrName: 'Hendersonville 2nd Branch (Pohnpeian)',
+    // LCR reports this one as a ward as of the 2026-10-10 export, but
+    // keeps the language designation the display name drops.
+    lcrName: 'Hendersonville 2nd Ward (Pohnpeian)',
     kind: 'ward',
   },
 ];
