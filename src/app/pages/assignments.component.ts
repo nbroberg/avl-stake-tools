@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { combineLatest, map, of, switchMap } from 'rxjs';
@@ -24,7 +24,7 @@ import {
 } from '../models/types';
 
 /** Distinguishes a calling extension from a release from a priesthood
- * advancement - the axis the top-of-page toggle filters on. */
+ * advancement - drives each row's colored border and type tag. */
 type RowType = 'calling' | 'release' | 'advancement';
 
 interface PersonalRow {
@@ -68,33 +68,6 @@ const TYPE_LABELS: Record<RowType, string> = {
   template: `
     <div class="stack">
       <h1 style="margin-bottom: 0">Assignments</h1>
-
-      <div class="row" role="group" aria-label="Filter by type">
-        <button
-          type="button"
-          class="btn btn-sm"
-          [class.btn-primary]="typeFilter() === 'all'"
-          (click)="typeFilter.set('all')"
-        >
-          All
-        </button>
-        <button
-          type="button"
-          class="btn btn-sm"
-          [class.btn-primary]="typeFilter() === 'calling'"
-          (click)="typeFilter.set('calling')"
-        >
-          Callings
-        </button>
-        <button
-          type="button"
-          class="btn btn-sm"
-          [class.btn-primary]="typeFilter() === 'release'"
-          (click)="typeFilter.set('release')"
-        >
-          Releases
-        </button>
-      </div>
 
       <div class="stack">
         <strong>Your assignments</strong>
@@ -283,19 +256,6 @@ export class AssignmentsComponent {
   protected readonly isPresidency = isPresidency;
   protected readonly typeLabel = (type: RowType) => TYPE_LABELS[type];
 
-  /**
-   * "All" vs. "Callings" vs. "Releases" toggle at the top of the page.
-   * Advancements are neither, so selecting either non-"all" option hides
-   * them too - the toggle answers "which of these direction-of-change rows
-   * do I want," not "show me advancements as well."
-   */
-  protected readonly typeFilter = signal<'all' | 'calling' | 'release'>('all');
-
-  private matchesFilter(type: RowType): boolean {
-    const filter = this.typeFilter();
-    return filter === 'all' || filter === type;
-  }
-
   private readonly callingsService = inject(CallingsService);
   private readonly advancementsService = inject(PriesthoodAdvancementsService);
 
@@ -335,7 +295,7 @@ export class AssignmentsComponent {
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/advancements', w.id],
       }));
-    return [...callingRows, ...advancementRows].filter((r) => this.matchesFilter(r.type));
+    return [...callingRows, ...advancementRows];
   });
 
   /**
@@ -361,8 +321,7 @@ export class AssignmentsComponent {
         title: w.callingName,
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
-      }))
-      .filter((r) => this.matchesFilter(r.type));
+      }));
   });
 
   /**
@@ -393,7 +352,7 @@ export class AssignmentsComponent {
         link: ['/advancements', w.id],
         proposedDate: formatTimestamp(w.proposedDate),
       }));
-    return [...callingRows, ...advancementRows].filter((r) => this.matchesFilter(r.type));
+    return [...callingRows, ...advancementRows];
   });
 
   /**
@@ -470,9 +429,7 @@ export class AssignmentsComponent {
   );
 
   protected readonly outstandingVotes = computed(() =>
-    [...this.outstandingCallings(), ...this.outstandingAdvancements()].filter((r) =>
-      this.matchesFilter(r.type),
-    ),
+    [...this.outstandingCallings(), ...this.outstandingAdvancements()],
   );
 
   /**
@@ -491,7 +448,6 @@ export class AssignmentsComponent {
         subtitle: `${w.personName} · ${workflowScopeLabel(w.unit)}`,
         link: ['/callings', w.id],
         assignedTo: w.assignedTo?.trim() || null,
-      }))
-      .filter((r) => this.matchesFilter(r.type)),
+      })),
   );
 }
