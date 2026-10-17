@@ -122,9 +122,10 @@ export function nextStatus(
  * Recording page only lists callings at least one unit has sustained).
  * Calling one of those before then would otherwise compute `nextStatus`
  * against an empty sustaining checklist and wrongly land on `sustained`.
+ * `complete` counts too: it's where an undo of the last mark starts from.
  */
 export function hasEnteredFinalizing(status: string): boolean {
-  return status === 'sustained' || status === 'set_apart' || status === 'recorded_in_lcr';
+  return status === 'sustained' || status === 'set_apart' || status === 'recorded_in_lcr' || status === 'complete';
 }
 
 export function formatTimestamp(ts?: Timestamp): string {

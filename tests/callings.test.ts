@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getNextStatuses, getPreviousStatus } from '../src/app/core/calling-status';
+import { getNextStatuses, getPreviousStatus, hasEnteredFinalizing } from '../src/app/core/calling-status';
 
 describe('getNextStatuses (calling lifecycle)', () => {
   it('walks the full calling lifecycle in order', () => {
@@ -127,5 +127,15 @@ describe('getPreviousStatus (calling lifecycle)', () => {
 
   it('walks the release lifecycle backward, skipping recorded_in_lcr', () => {
     expect(getPreviousStatus('release', 'complete')).toBe('sustained');
+  });
+});
+
+describe('hasEnteredFinalizing', () => {
+  it('is false before any unit has sustained', () => {
+    for (const s of ['proposed', 'accepted', 'released']) expect(hasEnteredFinalizing(s)).toBe(false);
+  });
+
+  it('is true from sustained through complete, so a completed calling can be undone', () => {
+    for (const s of ['sustained', 'set_apart', 'recorded_in_lcr', 'complete']) expect(hasEnteredFinalizing(s)).toBe(true);
   });
 });
