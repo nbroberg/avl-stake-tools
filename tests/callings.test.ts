@@ -74,7 +74,6 @@ describe('getNextStatuses (calling lifecycle)', () => {
     expect(path).toEqual([
       'proposed',
       'presidency_approved',
-      'release_extended',
       'released',
       'sustained',
       'recorded_in_lcr',

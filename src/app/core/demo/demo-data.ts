@@ -342,7 +342,7 @@ const WORKFLOW_SEEDS: WorkflowSeed[] = [
     personName: 'Simon Vasquez',
     callingName: 'Elders Quorum Secretary',
     unit: NORTHGATE,
-    status: 'release_extended',
+    status: 'released',
     ageDays: 11,
     notes: 'Moving out of the stake at the end of the month.',
   },

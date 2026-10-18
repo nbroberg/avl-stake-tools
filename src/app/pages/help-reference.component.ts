@@ -128,7 +128,7 @@ import { RouterLink } from '@angular/router';
           rules apply:
         </p>
         <p class="muted" style="margin: 0">
-          Proposed → Stake Presidency Approved → Release Extended → Released → Finalizing
+          Proposed → Stake Presidency Approved → Released → Finalizing
           (Sustained / Recorded in LCR) → Complete
         </p>
         <p class="text-sm muted" style="margin: 0">

@@ -110,10 +110,10 @@ Complete       ← reached automatically once fully sustained, recorded,
                  and set apart - never a direct write.
 ```
 
-**Release (7 states):** same idea, minus the set-apart leg.
+**Release (6 states):** same idea, minus the set-apart leg.
 
 ```
-Proposed → Stake Presidency Approved → Release Extended → Released →
+Proposed → Stake Presidency Approved → Released →
 Sustained/Recorded in LCR (Finalizing) → Complete
 ```
 

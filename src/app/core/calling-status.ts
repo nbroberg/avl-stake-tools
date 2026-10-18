@@ -67,6 +67,7 @@ export const DATE_FIELD_BY_STATUS: Record<string, keyof CallingWorkflow | undefi
   interview_assigned: 'interviewAssignedDate',
   calling_extended: 'extendedDate',
   release_extended: 'extendedDate',
+  released: 'extendedDate',
   accepted: 'acceptedDate',
   sustained: 'sustainedDate',
   set_apart: 'setApartDate',

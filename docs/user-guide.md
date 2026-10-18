@@ -139,7 +139,7 @@ A **release** is shorter — it skips both the high council vote and the
 interview assignment, since an ordinary stake calling doesn't go back
 through the council to be released, and has no setting-apart step:
 
-**Proposed → Stake Presidency Approved → Release Extended → Released →
+**Proposed → Stake Presidency Approved → Released →
 Finalizing (Sustained / Recorded in LCR) → Complete**
 
 Every workflow's detail page has a **History** section at the bottom

@@ -135,6 +135,8 @@ export type CallingStatus =
 export type ReleaseStatus =
   | 'proposed'
   | 'presidency_approved'
+  // Legacy: no longer in RELEASE_STATUS_ORDER (Released now records the
+  // release being extended). Kept so older history entries still label.
   | 'release_extended'
   | 'released'
   | 'sustained'
@@ -157,7 +159,6 @@ export const CALLING_STATUS_ORDER: CallingStatus[] = [
 export const RELEASE_STATUS_ORDER: ReleaseStatus[] = [
   'proposed',
   'presidency_approved',
-  'release_extended',
   'released',
   'sustained',
   'recorded_in_lcr',
