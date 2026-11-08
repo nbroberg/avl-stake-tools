@@ -135,6 +135,10 @@ export type CallingStatus =
 export type ReleaseStatus =
   | 'proposed'
   | 'presidency_approved'
+  // Same literal (and the same assignedTo field) as a calling's interview
+  // step, so the Assignments page and CallingsService.advanceStatus/
+  // rollbackStatus handle both workflow types without a special case.
+  | 'interview_assigned'
   // Legacy: no longer in RELEASE_STATUS_ORDER (Released now records the
   // release being extended). Kept so older history entries still label.
   | 'release_extended'
@@ -159,6 +163,7 @@ export const CALLING_STATUS_ORDER: CallingStatus[] = [
 export const RELEASE_STATUS_ORDER: ReleaseStatus[] = [
   'proposed',
   'presidency_approved',
+  'interview_assigned',
   'released',
   'sustained',
   'recorded_in_lcr',
@@ -181,6 +186,7 @@ export const CALLING_STATUS_LABELS: Record<CallingStatus, string> = {
 export const RELEASE_STATUS_LABELS: Record<ReleaseStatus, string> = {
   proposed: 'Proposed',
   presidency_approved: 'Stake Presidency Approved',
+  interview_assigned: 'Release Assigned',
   release_extended: 'Release Extended',
   released: 'Released',
   sustained: 'Sustained (Thanks)',

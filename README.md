@@ -110,10 +110,12 @@ Complete       ← reached automatically once fully sustained, recorded,
                  and set apart - never a direct write.
 ```
 
-**Release (6 states):** same idea, minus the set-apart leg.
+**Release (7 states):** same idea, minus the set-apart leg. Release
+Assigned reuses the `interview_assigned` status and `assignedTo` field, so
+the Assignments page treats both workflow types the same way.
 
 ```
-Proposed → Stake Presidency Approved → Released →
+Proposed → Stake Presidency Approved → Release Assigned → Released →
 Sustained/Recorded in LCR (Finalizing) → Complete
 ```
 
