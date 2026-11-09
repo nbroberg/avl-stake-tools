@@ -74,11 +74,22 @@ describe('getNextStatuses (calling lifecycle)', () => {
     expect(path).toEqual([
       'proposed',
       'presidency_approved',
+      'interview_assigned',
       'released',
       'sustained',
       'recorded_in_lcr',
       'complete',
     ]);
+  });
+
+  it('assigns a release before it can be marked released', () => {
+    expect(getNextStatuses('release', 'presidency_approved')).toEqual(['interview_assigned']);
+    expect(getNextStatuses('release', 'interview_assigned')).toEqual(['released']);
+  });
+
+  it('rolls a release back through its assigned step', () => {
+    expect(getPreviousStatus('release', 'released')).toBe('interview_assigned');
+    expect(getPreviousStatus('release', 'interview_assigned')).toBe('presidency_approved');
   });
 });
 

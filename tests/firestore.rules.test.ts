@@ -416,3 +416,85 @@ describe('callingWorkflows - high council votes are calling-only', () => {
     );
   });
 });
+
+describe('priesthoodAdvancements - high council votes', () => {
+  // Shaped like what PriesthoodAdvancementsService.create() actually
+  // writes: an `advancementType`, and NO `workflowType` field at all -
+  // that field only exists on callingWorkflows. The shared vote clauses
+  // must still work on a document that lacks it.
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'priesthoodAdvancements', 'adv-open'), {
+        advancementType: 'priest_to_elder',
+        status: 'presidency_approved',
+        hcApprovalUids: [],
+        hcConcernUids: [],
+        hcRequired: 9,
+      });
+      await setDoc(doc(ctx.firestore(), 'priesthoodAdvancements', 'adv-quorum'), {
+        advancementType: 'elder_to_high_priest',
+        status: 'presidency_approved',
+        hcApprovalUids: Array.from({ length: 9 }, (_, i) => `hc${i}`),
+        hcConcernUids: [],
+        hcRequired: 9,
+      });
+    });
+  });
+
+  it('lets a high councilor approve an advancement at presidency_approved', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'priesthoodAdvancements', 'adv-open'), {
+        hcApprovalUids: [COUNCILOR_UID],
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('lets a high councilor raise a concern on an advancement', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'priesthoodAdvancements', 'adv-open'), {
+        hcConcernUids: [COUNCILOR_UID],
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does not let a high councilor vote on behalf of someone else', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'priesthoodAdvancements', 'adv-open'), {
+        hcApprovalUids: ['someone-else'],
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('lets a high councilor advance an advancement once quorum is met with no concern', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'priesthoodAdvancements', 'adv-quorum'), {
+        status: 'high_council_approved',
+        highCouncilApprovedDate: new Date(),
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+
+  it('does not let a high councilor advance an advancement short of quorum', async () => {
+    const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'priesthoodAdvancements', 'adv-open'), {
+        status: 'high_council_approved',
+        highCouncilApprovedDate: new Date(),
+        updatedAt: new Date(),
+        updatedBy: COUNCILOR_UID,
+      }),
+    );
+  });
+});

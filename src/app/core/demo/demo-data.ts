@@ -337,6 +337,17 @@ const WORKFLOW_SEEDS: WorkflowSeed[] = [
     ageDays: 27,
   },
   {
+    // A release waiting at its assigned step, so the demo Assignments page
+    // shows a release alongside the calling interviews.
+    id: 'wf-release-stake-clerk',
+    workflowType: 'release',
+    personName: 'Victor Ramsey',
+    callingName: 'Stake Clerk',
+    status: 'interview_assigned',
+    ageDays: 9,
+    assignedTo: 'Peter Alvarado',
+  },
+  {
     id: 'wf-release-eq-sec',
     workflowType: 'release',
     personName: 'Simon Vasquez',

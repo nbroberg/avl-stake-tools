@@ -123,12 +123,12 @@ import { RouterLink } from '@angular/router';
           <li><strong>Complete</strong> — reached automatically once every unit has sustained it, it's recorded in LCR, and it's been set apart. Nothing to click.</li>
         </ol>
         <p style="margin: 0">
-          A <strong>release</strong> is shorter, skips both the high council vote and the
-          interview assignment, and has no setting-apart step — otherwise the same Finalizing
-          rules apply:
+          A <strong>release</strong> is shorter: it skips the high council vote and has no
+          setting-apart step, but is assigned to whoever will extend the release before it can be
+          marked Released — otherwise the same Finalizing rules apply:
         </p>
         <p class="muted" style="margin: 0">
-          Proposed → Stake Presidency Approved → Released → Finalizing
+          Proposed → Stake Presidency Approved → Release Assigned → Released → Finalizing
           (Sustained / Recorded in LCR) → Complete
         </p>
         <p class="text-sm muted" style="margin: 0">

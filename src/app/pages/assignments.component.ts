@@ -49,7 +49,7 @@ interface ProposedRow extends PersonalRow {
   proposedDate: string;
 }
 
-/** The one status at which a calling has a live interview assignment. */
+/** The one status at which a calling or release has a live assignment. */
 const INTERVIEW_ASSIGNED_STATUS = 'interview_assigned';
 
 /** The status a workflow starts at, before the presidency's own first review. */

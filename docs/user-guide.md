@@ -135,11 +135,13 @@ Finalizing begins - see step 7:
 8. **Complete** — reached automatically once the calling is fully
    sustained, recorded in LCR, and set apart. Nothing to click.
 
-A **release** is shorter — it skips both the high council vote and the
-interview assignment, since an ordinary stake calling doesn't go back
-through the council to be released, and has no setting-apart step:
+A **release** is shorter — it skips the high council vote, since an
+ordinary stake calling doesn't go back through the council to be
+released, and has no setting-apart step. Like a calling, it's assigned to
+the person who will extend the release before it can be marked Released;
+the dropdown is limited to the same people who could extend that calling:
 
-**Proposed → Stake Presidency Approved → Released →
+**Proposed → Stake Presidency Approved → Release Assigned → Released →
 Finalizing (Sustained / Recorded in LCR) → Complete**
 
 Every workflow's detail page has a **History** section at the bottom
@@ -255,8 +257,8 @@ Callings/Advancements pages themselves.
 
 - **High Council votes** — proposals you as a councilor haven't yet
   approved or raised a concern on.
-- **Interviews to conduct** — callings at the Interview Assigned step where
-  you're the one assigned. (This matches by your name, so if you're
+- **Interviews to conduct** — callings at the Interview Assigned step and
+  releases at the Release Assigned step where you're the one assigned. (This matches by your name, so if you're
   assigned under a slightly different name than the one you're signed in
   under, it may not show up here — the assignment itself is still fine and
   visible to everyone from the Callings list.)
@@ -270,7 +272,8 @@ stake** — the whole picture, not just your own:
   stake-wide, with the running tally and who's approved or raised a
   concern.
 - **Interview assignments** — every calling at the Interview Assigned step
-  stake-wide, and who (if anyone) it's assigned to.
+  and release at the Release Assigned step, stake-wide, and who (if anyone)
+  it's assigned to.
 
 ## Rolling back or deleting a workflow
 

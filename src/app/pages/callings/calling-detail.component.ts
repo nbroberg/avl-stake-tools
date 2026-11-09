@@ -88,7 +88,8 @@ function displayStatusLabel(w: CallingWorkflow): string {
             <p class="muted" style="margin: 0">{{ w.personName }} &middot; {{ workflowScopeLabel(w.unit) }}</p>
             @if (w.assignedTo) {
               <p class="text-sm" style="margin: 0.25rem 0 0">
-                <span class="muted">Interview assigned to:</span> <strong>{{ w.assignedTo }}</strong>
+                <span class="muted">{{ w.workflowType === 'release' ? 'Release' : 'Interview' }} assigned to:</span>
+                <strong>{{ w.assignedTo }}</strong>
               </p>
             }
             @if (w.setApartBy) {
@@ -447,7 +448,8 @@ function displayStatusLabel(w: CallingWorkflow): string {
                   } @else {
                     <p class="text-sm muted" style="margin: 0">
                       No one in the roster currently holds a calling that would authorize them
-                      to extend this. Import the roster from LCR, or use a name here:
+                      to {{ w.workflowType === 'release' ? 'extend this release' : 'extend this' }}.
+                      Import the roster from LCR, or use a name here:
                     </p>
                     <input
                       [ngModel]="pendingAssignee()"
@@ -719,9 +721,9 @@ export class CallingDetailComponent {
 
   /**
    * Releases never pass through `high_council_approved` - the release
-   * ladder (RELEASE_STATUS_ORDER) skips straight from presidency approval
-   * to extending the release, since the high council only weighs in on
-   * who gets called, not who gets released.
+   * ladder (RELEASE_STATUS_ORDER) goes straight from presidency approval
+   * to assigning who will extend the release, since the high council only
+   * weighs in on who gets called, not who gets released.
    *
    * This used to re-derive that rule inline, which is how it drifted: the
    * card was correctly hidden here while the assignment and calling lists

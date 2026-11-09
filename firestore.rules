@@ -188,9 +188,16 @@ service cloud.firestore {
      * gets called, not who gets released, and RELEASE_STATUS_ORDER has no
      * `high_council_approved` rung - so a vote recorded on a release could
      * never advance anything, and has no business being stored.
+     *
+     * The workflowType check MUST use .get() with a default: this
+     * function is shared with priesthoodAdvancements, whose documents
+     * have no workflowType field at all, and a plain
+     * `resource.data.workflowType` on a missing field is an evaluation
+     * error - which denies the write. (That's exactly how high council
+     * votes on advancements were silently blocked.)
      */
     function isHighCouncilSelfVote() {
-      return resource.data.workflowType != 'release'
+      return resource.data.get('workflowType', '') != 'release'
         && resource.data.status == 'presidency_approved'
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['hcApprovalUids', 'hcConcernUids', 'updatedAt', 'updatedBy'])
@@ -218,7 +225,7 @@ service cloud.firestore {
     function isHighCouncilQuorumAdvance() {
       // Releases never reach `high_council_approved` - it isn't in their
       // ladder at all - so this path must not be open to them either.
-      return resource.data.workflowType != 'release'
+      return resource.data.get('workflowType', '') != 'release'
         && resource.data.status == 'presidency_approved'
         && request.resource.data.status == 'high_council_approved'
         && resource.data.hcApprovalUids.size() >= resource.data.hcRequired
