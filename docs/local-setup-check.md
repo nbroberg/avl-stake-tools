@@ -11,7 +11,7 @@ the maintainer can paste back into that cloud session.
   the Keychain or LCR. Don't deploy anything. Don't commit or push.
 - **Never print a secret value.** Don't print API keys, service-account
   JSON, private keys, tokens, passwords, or the contents of `.env.local`.
-  Report only "present/missing", lengths, short SHA-256 fingerprints, file
+  Report only "present/missing", lengths, file
   permissions and non-secret metadata such as a project ID or a
   service-account email.
 - **Never print member data.** Don't print names, birth years or callings
@@ -38,32 +38,15 @@ be **siblings in the same folder**.
 
 - [ ] `.env.local` exists and `git check-ignore .env.local` confirms it's
       ignored.
-- [ ] For each key, report set/missing **and** a 12-character fingerprint,
-      then compare it with the cloud environment's fingerprint below. Use
-      this (prints no values):
+- [ ] For each key, report only whether it's set or missing. Use this
+      (prints no values):
 
 ```bash
 cd avl-stake-tools
 for k in FIREBASE_API_KEY FIREBASE_AUTH_DOMAIN FIREBASE_PROJECT_ID FIREBASE_STORAGE_BUCKET FIREBASE_MESSAGING_SENDER_ID FIREBASE_APP_ID GOOGLE_AUTH_HD GOOGLE_GEOCODING_API_KEY ENABLE_DEMO_MODE; do
-  v=$(grep -E "^$k=" .env.local | head -1 | cut -d= -f2-)
-  if [ -n "$v" ]; then printf '%-30s set  %s\n' "$k" "$(printf %s "$v" | shasum -a 256 | cut -c1-12)"; else printf '%-30s MISSING\n' "$k"; fi
+  if grep -qE "^$k=.+" .env.local; then echo "$k: set"; else echo "$k: MISSING"; fi
 done
 ```
-
-Fingerprints of the values in the cloud environment (SHA-256, first 12 hex
-characters):
-
-| Key | Cloud fingerprint |
-|---|---|
-| FIREBASE_API_KEY | `50c1b774417d` |
-| FIREBASE_AUTH_DOMAIN | `3aa121f01f97` |
-| FIREBASE_PROJECT_ID | `f9a787cd2ca7` |
-| FIREBASE_STORAGE_BUCKET | `0463645a8a19` |
-| FIREBASE_MESSAGING_SENDER_ID | `3b0f6ce8e7f0` |
-| FIREBASE_APP_ID | `8bbb379c1cf8` |
-| GOOGLE_GEOCODING_API_KEY | `3e55f20c542f` |
-| GOOGLE_AUTH_HD | not set in cloud |
-| ENABLE_DEMO_MODE | not set in cloud |
 
 - [ ] `.firebaserc` exists, is ignored by git, and its `default` project
       matches `FIREBASE_PROJECT_ID`. A project ID isn't secret, so it's fine
@@ -169,7 +152,7 @@ Finish with one block the maintainer can paste into the cloud session:
 ```
 LOCAL CHECK REPORT
 1 Layout:        OK | <problem>
-2 .env.local:    keys set N/9; fingerprints match: <list mismatches or "all">; .firebaserc project ok?
+2 .env.local:    keys set N/9; .firebaserc project ok?
 3 GH secrets:    N/8 present; possibly stale: <names>
 4 Rules:         live == repo? <yes | summary of diff>
 5 Sync tool:     node vX; deps installed?; key outside repo/600/project ok?; key count/age; roles; profile; keychain
