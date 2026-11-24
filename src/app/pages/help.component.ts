@@ -73,9 +73,9 @@ import { RouterLink } from '@angular/router';
           advancement from start to finish.
         </p>
         <p style="margin: 0">
-          <strong>High Council</strong> members can see everything, vote to approve proposals, and
-          record what happens during a Sunday visit - sustaining, releasing, setting apart, or
-          ordaining someone in person.
+          <strong>High Council</strong> members can see a calling, release, or advancement once it reaches their stage, vote
+          to approve proposals, and record what happens during a Sunday visit - sustaining,
+          presenting releases for a vote of thanks, setting apart, or ordaining someone in person.
         </p>
         <p class="muted text-sm" style="margin: 0">
           Your role is set up for you ahead of time - see Questions or access requests below if it

@@ -33,11 +33,12 @@ There are two roles in this app:
   reaches the high council's stage: nothing while it's still Proposed; a
   calling the council votes on, and every priesthood advancement, from
   Stake Presidency Approved; and a release or a calling with no council
-  vote (such as a ward calling) only once it's ready to be sustained. High
+  vote (such as a ward calling) only once it's ready to be presented in a
+  unit (sustained, or a vote of thanks for a release). High
   councilors can only act at specific points: casting a vote (approve or raise a concern) on a proposal once
   it's reached Stake Presidency Approved; recording what happens during a
-  Sunday visit to a unit — sustaining, releasing, setting apart, or
-  ordaining, in person; and, once a calling has begun Finalizing, logging
+  Sunday visit to a unit — sustaining, presenting releases for a vote of
+  thanks, setting apart, or ordaining, in person; and, once a calling has begun Finalizing, logging
   that it was set apart even outside a Sunday visit, always under their
   own name.
 
@@ -139,9 +140,9 @@ Finalizing begins - see step 7:
 8. **Complete** — reached automatically once the calling is fully
    sustained, recorded in LCR, and set apart. Nothing to click.
 
-A **release** is shorter — it skips the high council vote, since an
-ordinary stake calling doesn't go back through the council to be
-released, and has no setting-apart step. Like a calling, it's assigned to
+A **release** is shorter — it skips the high council vote, since the
+high council weighs in on who gets called, not who gets released, and has
+no setting-apart step. Like a calling, it's assigned to
 the person who will extend the release before it can be marked Released;
 the dropdown is limited to the same people who could extend that calling:
 
@@ -187,11 +188,15 @@ etc.) there's no single stake conference to sustain it at in this app's
 model, so it's sustained **ward by ward** as the presidency or council
 visits each unit — the workflow's detail page shows how many of the
 stake's units have signed off so far, and lets you check off units as you
-go. The calling enters Finalizing the moment the first one does.
+go. The calling enters Finalizing the moment the first one does. A
+stake-level **release** works the same way, except each unit gives a vote
+of thanks instead of sustaining, and the card is titled **Vote of thanks
+across the stake**.
 
 The presidency can mark individual units sustained even before every unit
 has confirmed, if that's genuinely necessary, or use **Mark all units
-sustained** to bulk-mark everything still outstanding at once — a
+sustained** (**Mark vote of thanks given in all units** for a release) to
+bulk-mark everything still outstanding at once — a
 confirmation lists which units that will affect first. Units marked this
 way show "marked by Stake Presidency" so they're distinguishable from
 ones a unit reported for itself, and that bulk mark can be undone on its
@@ -242,7 +247,7 @@ Go to **Units**, and pick the ward or branch you're visiting. You'll see
 four lists, filtered to just that unit and just what's ready to act on
 today:
 
-- **Needs sustaining** — callings and releases ready to be sustained there.
+- **Needs sustaining** — callings ready to be sustained there.
 - **Releases** — releases ready for a vote of thanks.
 - **Needs setting apart** — people ready to be set apart. A stake calling
   that's fully sustained and recorded but still needs setting apart shows

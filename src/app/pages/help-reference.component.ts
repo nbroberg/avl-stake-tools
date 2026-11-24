@@ -40,10 +40,11 @@ import { RouterLink } from '@angular/router';
           <strong>High Council</strong> — sees a calling, release or advancement only once it
           reaches their stage: nothing while Proposed; a calling the council votes on, and every
           advancement, from Stake Presidency Approved; a release or a calling with no council vote
-          only once it's ready to be sustained. They can only act at specific points:
+          only once it's ready to be presented in a unit (sustained, or a vote of thanks for a
+          release). They can only act at specific points:
           casting a vote (approve or raise a concern) once a proposal reaches Stake Presidency
           Approved; recording what happens during a Sunday visit to a unit — sustaining,
-          releasing, setting apart, or ordaining, in person; and, once a calling has begun
+          presenting releases for a vote of thanks, setting apart, or ordaining, in person; and, once a calling has begun
           Finalizing, logging that it was set apart even outside a Sunday visit, always under
           their own name.
         </p>
@@ -126,8 +127,8 @@ import { RouterLink } from '@angular/router';
           <li><strong>Complete</strong> — reached automatically once every unit has sustained it, it's recorded in LCR, and it's been set apart. Nothing to click.</li>
         </ol>
         <p style="margin: 0">
-          A <strong>release</strong> is shorter: it skips the high council vote and has no
-          setting-apart step, but is assigned to whoever will extend the release before it can be
+          A <strong>release</strong> is shorter: it skips the high council vote (the high council weighs in
+          on who gets called, not who gets released) and has no setting-apart step, but is assigned to whoever will extend the release before it can be
           marked Released — otherwise the same Finalizing rules apply:
         </p>
         <p class="muted" style="margin: 0">
@@ -177,11 +178,14 @@ import { RouterLink } from '@angular/router';
           <strong>stake-level</strong> calling has no single stake conference to sustain it at in
           this app's model, so it's sustained ward by ward as the presidency or council visits
           each unit — the detail page shows how many units have signed off so far, and the
-          calling enters Finalizing the moment the first one does.
+          calling enters Finalizing the moment the first one does. A stake-level
+          <strong>release</strong> works the same way, except each unit gives a vote of thanks
+          instead of sustaining, and the card reads "Vote of thanks across the stake".
         </p>
         <p style="margin: 0">
           The presidency can mark individual units sustained even before every unit confirms, or
-          use <strong>Mark all units sustained</strong> to bulk-mark everything still outstanding
+          use <strong>Mark all units sustained</strong> (<strong>Mark vote of thanks given in
+          all units</strong> for a release) to bulk-mark everything still outstanding
           at once (after a confirmation listing which units) — units marked this way show
           "marked by Stake Presidency" next to them, and that bulk mark can be undone on its own
           without touching any unit that reported for itself.

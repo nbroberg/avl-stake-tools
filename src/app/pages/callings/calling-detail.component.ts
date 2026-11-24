@@ -257,21 +257,21 @@ function displayStatusLabel(w: CallingWorkflow): string {
 
         @if (showSustainingChecklist()) {
           <div class="card stack">
-            <strong>Sustaining across the stake</strong>
+            <strong>{{ terms(w).title }}</strong>
             <p class="text-sm" style="margin: 0">
               <strong>{{ sustainedUnitCount() }}</strong> of
-              <strong>{{ stakeUnitsList.length }}</strong> units sustained
+              <strong>{{ stakeUnitsList.length }}</strong> units {{ terms(w).done }}
               &middot;
               @if (sustainingComplete()) {
                 <span style="color: var(--accent)">all units done</span>
               } @else {
-                <span class="muted">no stake conference to sustain this at, so it's ward-by-ward</span>
+                <span class="muted">{{ terms(w).why }}</span>
               }
             </p>
             @if (!sustainingComplete() && isPresidency(authService.appUser())) {
               <p class="text-sm muted" style="margin: 0">
-                You may mark this sustained now anyway — doing so before every unit confirms
-                will be noted in the audit trail below.
+                You may {{ terms(w).markThis }} now anyway — doing so before every unit
+                {{ terms(w).unitDoes }} will be noted in the audit trail below.
               </p>
             }
             @for (u of stakeUnitsList; track u.number) {
@@ -293,11 +293,11 @@ function displayStatusLabel(w: CallingWorkflow): string {
                 <div class="confirm stack">
                   <span class="text-sm">
                     Mark the remaining {{ missingUnits().length }} unit{{ missingUnits().length === 1 ? '' : 's' }}
-                    sustained: {{ missingUnits().map(unitLabel).join(', ') }}?
+                    {{ terms(w).remaining }}: {{ missingUnits().map(unitLabel).join(', ') }}?
                   </span>
                   <div class="row">
                     <button class="btn btn-primary" [disabled]="busy()" (click)="markAllUnitsSustained(w)">
-                      Yes, mark all as sustained
+                      {{ terms(w).confirmAll }}
                     </button>
                     <button class="btn" [disabled]="busy()" (click)="confirmingMarkAllUnits.set(false)">
                       Cancel
@@ -311,7 +311,7 @@ function displayStatusLabel(w: CallingWorkflow): string {
                   [disabled]="busy()"
                   (click)="confirmingMarkAllUnits.set(true)"
                 >
-                  Mark all units sustained
+                  {{ terms(w).markAll }}
                 </button>
               }
             }
@@ -323,7 +323,7 @@ function displayStatusLabel(w: CallingWorkflow): string {
                 [disabled]="busy()"
                 (click)="undoMarkAllUnitsSustained(w)"
               >
-                Undo the Stake Presidency's bulk sustaining mark
+                Undo the Stake Presidency's bulk {{ terms(w).noun }} mark
               </button>
             }
           </div>
@@ -331,14 +331,14 @@ function displayStatusLabel(w: CallingWorkflow): string {
 
         @if (w.unit && inFinalizing()) {
           <div class="card stack">
-            <strong>Sustained</strong>
+            <strong>{{ terms(w).unitTitle }}</strong>
             <p class="text-sm" style="margin: 0">
-              Sustained{{ w.sustainedDate ? ' on ' + formatTimestamp(w.sustainedDate) : '' }}
+              {{ terms(w).unitTitle }}{{ w.sustainedDate ? ' on ' + formatTimestamp(w.sustainedDate) : '' }}
               in {{ workflowScopeLabel(w.unit) }}.
             </p>
             @if (canUndoUnitSustain(authService.appUser())) {
               <button class="btn btn-responsive" [disabled]="busy()" (click)="undoUnitSustained(w)">
-                Undo sustaining
+                Undo {{ terms(w).noun }}
               </button>
             }
           </div>
@@ -684,6 +684,40 @@ export class CallingDetailComponent {
   protected readonly isPresidency = isPresidency;
   protected readonly workflowScopeLabel = workflowScopeLabel;
   protected readonly unitLabel = unitLabel;
+
+  /**
+   * Units present a calling for a sustaining vote and a release for a vote
+   * of thanks. Both are tracked the same way (sustainedInUnits, the
+   * `sustained` status), so the cards are shared and only the wording
+   * follows the workflow type.
+   */
+  protected terms(w: CallingWorkflow) {
+    return w.workflowType === 'release'
+      ? {
+          title: 'Vote of thanks across the stake',
+          done: 'have given a vote of thanks',
+          markThis: 'mark the vote of thanks given',
+          remaining: 'as having given a vote of thanks',
+          confirmAll: 'Yes, mark all as given',
+          noun: 'vote of thanks',
+          unitDoes: 'gives its vote of thanks',
+          why: "no stake conference to present this release at, so each unit gives its own vote of thanks",
+          markAll: 'Mark vote of thanks given in all units',
+          unitTitle: 'Vote of thanks given',
+        }
+      : {
+          title: 'Sustaining across the stake',
+          done: 'sustained',
+          markThis: 'mark this sustained',
+          remaining: 'sustained',
+          confirmAll: 'Yes, mark all as sustained',
+          noun: 'sustaining',
+          unitDoes: 'sustains it',
+          why: 'no stake conference to sustain this at, so each unit sustains it',
+          markAll: 'Mark all units sustained',
+          unitTitle: 'Sustained',
+        };
+  }
   protected readonly labelsFor = labelsFor;
   protected readonly displayStatusLabel = displayStatusLabel;
   protected readonly formatTimestamp = formatTimestamp;

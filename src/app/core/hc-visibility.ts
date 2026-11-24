@@ -14,9 +14,10 @@ import type { CallingWorkflow, PriesthoodAdvancementWorkflow } from '../models/t
  *    that's the high council's own stage.
  *  - Anything the high council never votes on (a release, a ward calling
  *    such as EQ secretary, a calling approved outside the stake) stays
- *    hidden until it's ready for a unit to sustain (`accepted` or
- *    `released`), which is the first point a high councilor has a job to
- *    do on it (sustaining, then setting apart on a Sunday visit).
+ *    hidden until it's ready to be presented in a unit (`accepted` for a
+ *    sustaining vote, `released` for a vote of thanks), which is the first
+ *    point a high councilor has a job to do on it (presenting it, then
+ *    setting apart a calling, on a Sunday visit).
  *
  * The result is stored on each workflow as `hcVisible` and kept in step by
  * every write that changes `status` (create, advanceStatus, rollbackStatus

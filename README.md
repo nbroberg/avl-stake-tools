@@ -45,8 +45,8 @@ Firestore directly).
 the high council votes on, and every priesthood advancement, becomes
 visible at `presidency_approved`. Anything the high council never votes
 on (a release, a ward calling such as EQ secretary, a calling approved
-outside the stake) stays hidden until it's ready for a unit to sustain
-(`accepted` / `released`). The app writes this as an `hcVisible` flag on
+outside the stake) stays hidden until it's ready to be presented in a unit - sustained, or
+a vote of thanks for a release (`accepted` / `released`). The app writes this as an `hcVisible` flag on
 every status change (`core/hc-visibility.ts`); `firestore.rules` only
 serves high councilors documents (and their `history/`) where it's true,
 refuses `hcVisible: true` on a `proposed` document, and a high
@@ -96,9 +96,8 @@ readable only by its owner. Chasing stragglers stays an out-of-band job.
 
 Both `calling` and `release` workflow types share the first two states
 but then diverge. New callings walk the full 10-state pipeline;
-releases skip the high council step (ordinary stake callings do not go
-back through the high council for release) and skip the interview
-assignment.
+releases skip the high council step (the high council weighs in on who
+gets called, not who gets released) and the set-apart leg.
 
 **New calling (10 states):**
 
