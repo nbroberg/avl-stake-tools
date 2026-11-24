@@ -142,7 +142,8 @@ const VOTING_STATUS = 'presidency_approved';
  *
  * Two separate reasons it might not:
  *
- *  1. It's a RELEASE. Releases don't go back through the high council;
+ *  1. It's a RELEASE. The high council weighs in on who gets called, not
+ *     who gets released;
  *     RELEASE_STATUS_ORDER has no `high_council_approved` rung, so a vote
  *     there could never advance anything even if it were cast.
  *  2. The calling's approving authority sits outside the stake (First
