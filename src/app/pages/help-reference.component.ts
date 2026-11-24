@@ -178,11 +178,14 @@ import { RouterLink } from '@angular/router';
           <strong>stake-level</strong> calling has no single stake conference to sustain it at in
           this app's model, so it's sustained ward by ward as the presidency or council visits
           each unit — the detail page shows how many units have signed off so far, and the
-          calling enters Finalizing the moment the first one does.
+          calling enters Finalizing the moment the first one does. A stake-level
+          <strong>release</strong> works the same way, except each unit gives a vote of thanks
+          instead of sustaining, and the card reads "Vote of thanks across the stake".
         </p>
         <p style="margin: 0">
           The presidency can mark individual units sustained even before every unit confirms, or
-          use <strong>Mark all units sustained</strong> to bulk-mark everything still outstanding
+          use <strong>Mark all units sustained</strong> (<strong>Mark vote of thanks given in
+          all units</strong> for a release) to bulk-mark everything still outstanding
           at once (after a confirmation listing which units) — units marked this way show
           "marked by Stake Presidency" next to them, and that bulk mark can be undone on its own
           without touching any unit that reported for itself.

@@ -188,11 +188,15 @@ etc.) there's no single stake conference to sustain it at in this app's
 model, so it's sustained **ward by ward** as the presidency or council
 visits each unit — the workflow's detail page shows how many of the
 stake's units have signed off so far, and lets you check off units as you
-go. The calling enters Finalizing the moment the first one does.
+go. The calling enters Finalizing the moment the first one does. A
+stake-level **release** works the same way, except each unit gives a vote
+of thanks instead of sustaining, and the card is titled **Vote of thanks
+across the stake**.
 
 The presidency can mark individual units sustained even before every unit
 has confirmed, if that's genuinely necessary, or use **Mark all units
-sustained** to bulk-mark everything still outstanding at once — a
+sustained** (**Mark vote of thanks given in all units** for a release) to
+bulk-mark everything still outstanding at once — a
 confirmation lists which units that will affect first. Units marked this
 way show "marked by Stake Presidency" so they're distinguishable from
 ones a unit reported for itself, and that bulk mark can be undone on its
