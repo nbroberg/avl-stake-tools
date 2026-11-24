@@ -5,7 +5,20 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  addDoc,
+  collection as col,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 /**
@@ -72,8 +85,17 @@ beforeEach(async () => {
       unit: '900101',
       active: true,
     });
-    await setDoc(doc(db, 'callingWorkflows', 'wf-1'), { status: 'proposed' });
-    await setDoc(doc(db, 'priesthoodAdvancements', 'wf-1'), { status: 'proposed' });
+    // Past the presidency's review, so visible to the high council - the
+    // generic read tests below exercise role checks, not visibility (see
+    // the "visibility to the high council" suite for that).
+    await setDoc(doc(db, 'callingWorkflows', 'wf-1'), {
+      status: 'presidency_approved',
+      hcVisible: true,
+    });
+    await setDoc(doc(db, 'priesthoodAdvancements', 'wf-1'), {
+      status: 'presidency_approved',
+      hcVisible: true,
+    });
     await setDoc(doc(db, 'rosterSync', 'status'), { behind: false });
   });
 });
@@ -498,3 +520,100 @@ describe('priesthoodAdvancements - high council votes', () => {
     );
   });
 });
+
+describe.each(['callingWorkflows', 'priesthoodAdvancements'] as const)(
+  '%s - visibility to the high council',
+  (collection) => {
+    // A proposal the presidency hasn't approved yet, one already at the
+    // high council's stage, and one written before hcVisible existed.
+    beforeEach(async () => {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        const createdAt = new Date('2026-11-01');
+        await setDoc(doc(db, collection, 'wf-hidden'), {
+          status: 'proposed',
+          hcVisible: false,
+          createdAt,
+        });
+        await setDoc(doc(db, collection, 'wf-visible'), {
+          status: 'presidency_approved',
+          hcVisible: true,
+          createdAt,
+        });
+        await setDoc(doc(db, collection, 'wf-legacy'), { status: 'presidency_approved', createdAt });
+        await setDoc(doc(db, collection, 'wf-hidden', 'history', 'h1'), { status: 'proposed' });
+        await setDoc(doc(db, collection, 'wf-visible', 'history', 'h1'), { status: 'proposed' });
+      });
+    });
+
+    it('does not let a high councilor read a hidden workflow', async () => {
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertFails(getDoc(doc(db, collection, 'wf-hidden')));
+    });
+
+    it('treats a workflow without hcVisible as hidden', async () => {
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertFails(getDoc(doc(db, collection, 'wf-legacy')));
+    });
+
+    it('lets a high councilor read a visible workflow', async () => {
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertSucceeds(getDoc(doc(db, collection, 'wf-visible')));
+    });
+
+    it('lets the presidency read a hidden workflow', async () => {
+      const db = testEnv.authenticatedContext(PRESIDENT_UID).firestore();
+      await assertSucceeds(getDoc(doc(db, collection, 'wf-hidden')));
+    });
+
+    it("hides a hidden workflow's history from a high councilor", async () => {
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertFails(getDoc(doc(db, collection, 'wf-hidden', 'history', 'h1')));
+      await assertSucceeds(getDoc(doc(db, collection, 'wf-visible', 'history', 'h1')));
+    });
+
+    it('does not let a high councilor add history to a hidden workflow', async () => {
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertFails(
+        addDoc(col(db, collection, 'wf-hidden', 'history'), { status: 'proposed' }),
+      );
+    });
+
+    it("allows a high councilor's list query that asks for hcVisible", async () => {
+      // The exact shape listWorkflows() sends for a high councilor.
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertSucceeds(
+        getDocs(
+          query(
+            col(db, collection),
+            where('hcVisible', '==', true),
+            orderBy('createdAt', 'desc'),
+          ),
+        ),
+      );
+    });
+
+    it("rejects a high councilor's unfiltered list query outright", async () => {
+      const db = testEnv.authenticatedContext(COUNCILOR_UID).firestore();
+      await assertFails(getDocs(query(col(db, collection), orderBy('createdAt', 'desc'))));
+    });
+
+    it('does not let the presidency create a proposed workflow marked visible', async () => {
+      const db = testEnv.authenticatedContext(PRESIDENT_UID).firestore();
+      await assertFails(
+        setDoc(doc(db, collection, 'wf-new'), { status: 'proposed', hcVisible: true }),
+      );
+      await assertSucceeds(
+        setDoc(doc(db, collection, 'wf-new'), { status: 'proposed', hcVisible: false }),
+      );
+    });
+
+    it('does not let the presidency roll a workflow back to proposed while leaving it visible', async () => {
+      const db = testEnv.authenticatedContext(PRESIDENT_UID).firestore();
+      await assertFails(updateDoc(doc(db, collection, 'wf-visible'), { status: 'proposed' }));
+      await assertSucceeds(
+        updateDoc(doc(db, collection, 'wf-visible'), { status: 'proposed', hcVisible: false }),
+      );
+    });
+  },
+);

@@ -288,6 +288,13 @@ export interface CallingWorkflow {
    * changes to the quorum constants don't move the goalposts.
    */
   hcRequired?: number;
+  /**
+   * Whether a high councilor may read this workflow at all - see
+   * core/hc-visibility.ts. Set on every status change; firestore.rules
+   * only serves high councilors documents where this is true. Missing on
+   * documents written before it existed until the backfill runs.
+   */
+  hcVisible?: boolean;
   notes?: string;
   createdBy: string;
   updatedBy: string;
@@ -397,6 +404,13 @@ export interface PriesthoodAdvancementWorkflow {
   hcConcernUids?: string[];
   /** Snapshotted quorum threshold - see core/quorum.ts. */
   hcRequired?: number;
+  /**
+   * Whether a high councilor may read this workflow at all - see
+   * core/hc-visibility.ts. Set on every status change; firestore.rules
+   * only serves high councilors documents where this is true. Missing on
+   * documents written before it existed until the backfill runs.
+   */
+  hcVisible?: boolean;
   notes?: string;
   createdBy: string;
   updatedBy: string;

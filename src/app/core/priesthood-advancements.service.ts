@@ -20,7 +20,10 @@ import {
 import { Observable } from 'rxjs';
 import { db } from './firebase';
 import { DATE_FIELD_BY_ADVANCEMENT_STATUS, getPreviousStatus } from './advancement-status';
+import { AuthService } from './auth.service';
+import { advancementVisibleToHighCouncil } from './hc-visibility';
 import { HC_QUORUM_REQUIRED } from './quorum';
+import { isHighCouncil } from './roles';
 import { RosterSyncService } from './roster-sync.service';
 import type {
   AdvancementHistoryEntry,
@@ -60,6 +63,7 @@ export interface AdvanceAdvancementStatusOptions {
 @Injectable({ providedIn: 'root' })
 export class PriesthoodAdvancementsService {
   private readonly rosterSync = inject(RosterSyncService);
+  private readonly auth = inject(AuthService);
 
   /**
    * @param filters.limit Caps how many docs the query pulls, newest first.
@@ -71,8 +75,11 @@ export class PriesthoodAdvancementsService {
     limit?: number;
   }): Observable<PriesthoodAdvancementWorkflow[]> {
     return new Observable<PriesthoodAdvancementWorkflow[]>((subscriber) => {
+      // See CallingsService.listWorkflows for why a high councilor's query
+      // must ask for hcVisible itself.
       const q = query(
         collection(db, COLLECTION),
+        ...(isHighCouncil(this.auth.appUser()) ? [where('hcVisible', '==', true)] : []),
         ...(filters?.unit ? [where('unit', '==', filters.unit)] : []),
         orderBy('createdAt', 'desc'),
         ...(filters?.limit ? [limit(filters.limit)] : []),
@@ -111,6 +118,7 @@ export class PriesthoodAdvancementsService {
     const docRef = await addDoc(collection(db, COLLECTION), {
       ...input,
       status: initialStatus,
+      hcVisible: advancementVisibleToHighCouncil(initialStatus),
       proposedDate: serverTimestamp(),
       hcApprovalUids: [],
       hcConcernUids: [],
@@ -150,6 +158,7 @@ export class PriesthoodAdvancementsService {
     await runTransaction(db, async (tx) => {
       tx.update(ref, {
         status,
+        hcVisible: advancementVisibleToHighCouncil(status),
         updatedBy: actor.firebaseUid,
         updatedAt: serverTimestamp(),
         ...(dateField ? { [dateField]: serverTimestamp() } : {}),
@@ -190,6 +199,7 @@ export class PriesthoodAdvancementsService {
 
     await updateDoc(doc(db, COLLECTION, workflow.id), {
       status: previousStatus,
+      hcVisible: advancementVisibleToHighCouncil(previousStatus),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
       ...(dateField ? { [dateField]: deleteField() } : {}),

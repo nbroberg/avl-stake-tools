@@ -7,6 +7,22 @@
         { "fieldPath": "unit", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "callingWorkflows",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hcVisible", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "priesthoodAdvancements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "hcVisible", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
