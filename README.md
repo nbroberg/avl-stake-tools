@@ -36,8 +36,24 @@ Firestore directly).
 
 - `stake_presidency` — full read/write on the calling workflow, the
   roster, and every calling-status transition.
-- `high_council` — read everything; may only advance a workflow from
-  `presidency_approved` to `high_council_approved`. No other writes.
+- `high_council` — reads a calling, release or advancement only once
+  it reaches their stage (see "What the high council can see" below);
+  may only advance a workflow from `presidency_approved` to
+  `high_council_approved`, plus the Sunday-visit actions. No other writes.
+
+**What the high council can see.** Nothing while `proposed`. A calling
+the high council votes on, and every priesthood advancement, becomes
+visible at `presidency_approved`. Anything the high council never votes
+on (a release, a ward calling such as EQ secretary, a calling approved
+outside the stake) stays hidden until it's ready for a unit to sustain
+(`accepted` / `released`). The app writes this as an `hcVisible` flag on
+every status change (`core/hc-visibility.ts`); `firestore.rules` only
+serves high councilors documents (and their `history/`) where it's true,
+refuses `hcVisible: true` on a `proposed` document, and a high
+councilor's list query asks for `hcVisible == true` itself, backed by
+the composite indexes in `firestore.indexes.json`. Documents written
+before the flag existed read as hidden until backfilled (see
+`avl-stake-sync/migrations/001-backfill-hc-visible.ts`).
 
 Users cannot elevate themselves — `users/{uid}` is not writable from
 the app under any circumstances. New user records, role changes, and

@@ -37,7 +37,10 @@ import { RouterLink } from '@angular/router';
           calling or release recorded in LCR.
         </p>
         <p style="margin: 0">
-          <strong>High Council</strong> — can see everything, but can only act at specific points:
+          <strong>High Council</strong> — sees a calling, release or advancement only once it
+          reaches their stage: nothing while Proposed; a calling the council votes on, and every
+          advancement, from Stake Presidency Approved; a release or a calling with no council vote
+          only once it's ready to be sustained. They can only act at specific points:
           casting a vote (approve or raise a concern) once a proposal reaches Stake Presidency
           Approved; recording what happens during a Sunday visit to a unit — sustaining,
           releasing, setting apart, or ordaining, in person; and, once a calling has begun

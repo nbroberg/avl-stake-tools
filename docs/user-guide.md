@@ -29,8 +29,12 @@ There are two roles in this app:
   including bulk-marking every outstanding unit sustained at once; and the
   only role that can mark (or undo marking) a calling or release recorded
   in LCR, from the **LCR Recording** page.
-- **High Council** — can see everything, but can only act at specific
-  points: casting a vote (approve or raise a concern) on a proposal once
+- **High Council** — sees a calling, release or advancement only once it
+  reaches the high council's stage: nothing while it's still Proposed; a
+  calling the council votes on, and every priesthood advancement, from
+  Stake Presidency Approved; and a release or a calling with no council
+  vote (such as a ward calling) only once it's ready to be sustained. High
+  councilors can only act at specific points: casting a vote (approve or raise a concern) on a proposal once
   it's reached Stake Presidency Approved; recording what happens during a
   Sunday visit to a unit — sustaining, releasing, setting apart, or
   ordaining, in person; and, once a calling has begun Finalizing, logging

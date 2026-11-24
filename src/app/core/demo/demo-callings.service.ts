@@ -1,13 +1,17 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { Timestamp } from 'firebase/firestore';
-import { BehaviorSubject, Observable, map } from 'rxjs';
+import { BehaviorSubject, Observable, combineLatest, map } from 'rxjs';
 import type {
   AdvanceStatusOptions,
   CallingsService,
   NewCallingWorkflowInput,
 } from '../callings.service';
 import { DATE_FIELD_BY_STATUS, getPreviousStatus, hasEnteredFinalizing, nextStatus } from '../calling-status';
+import { AuthService } from '../auth.service';
+import { callingVisibleToHighCouncil } from '../hc-visibility';
 import { HC_QUORUM_REQUIRED } from '../quorum';
+import { isHighCouncil } from '../roles';
 import { isFullySustained, requiredUnitsFor } from '../sunday-visit';
 import { unitLabel } from '../units';
 import type {
@@ -63,9 +67,17 @@ export class DemoCallingsService
     }
   }
 
+  /** Follows the demo role switcher, so the high council view hides what
+   *  firestore.rules would hide from a real high councilor. */
+  private readonly appUser$ = toObservable(inject(AuthService).appUser);
+
   listWorkflows(filters?: { unit?: string }): Observable<CallingWorkflow[]> {
-    return this.workflows$.pipe(
-      map((all) => (filters?.unit ? all.filter((w) => w.unit === filters.unit) : all)),
+    return combineLatest([this.workflows$, this.appUser$]).pipe(
+      map(([all, user]) =>
+        all
+          .filter((w) => !isHighCouncil(user) || callingVisibleToHighCouncil(w, w.status))
+          .filter((w) => !filters?.unit || w.unit === filters.unit),
+      ),
     );
   }
 

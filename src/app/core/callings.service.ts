@@ -20,7 +20,10 @@ import {
 import { Observable } from 'rxjs';
 import { db } from './firebase';
 import { DATE_FIELD_BY_STATUS, getPreviousStatus, hasEnteredFinalizing, nextStatus } from './calling-status';
+import { AuthService } from './auth.service';
+import { callingVisibleToHighCouncil } from './hc-visibility';
 import { HC_QUORUM_REQUIRED } from './quorum';
+import { isHighCouncil } from './roles';
 import { RosterSyncService } from './roster-sync.service';
 import { isFullySustained, requiredUnitsFor } from './sunday-visit';
 import { unitLabel } from './units';
@@ -68,16 +71,23 @@ export interface AdvanceStatusOptions {
 @Injectable({ providedIn: 'root' })
 export class CallingsService {
   private readonly rosterSync = inject(RosterSyncService);
+  private readonly auth = inject(AuthService);
 
   /**
    * @param filters.limit Caps how many docs the query pulls, newest first.
    *   Omit to fetch every workflow (needed by lookups that must find any
    *   given workflow, e.g. the dashboard counts and detail pages).
+   *
+   * A high councilor only ever gets workflows marked `hcVisible` (see
+   * core/hc-visibility.ts). That has to be part of the query itself:
+   * firestore.rules denies their read of any other workflow, and Firestore
+   * rejects a whole query that could return even one denied document.
    */
   listWorkflows(filters?: { unit?: string; limit?: number }): Observable<CallingWorkflow[]> {
     return new Observable<CallingWorkflow[]>((subscriber) => {
       const q = query(
         collection(db, COLLECTION),
+        ...(isHighCouncil(this.auth.appUser()) ? [where('hcVisible', '==', true)] : []),
         ...(filters?.unit ? [where('unit', '==', filters.unit)] : []),
         orderBy('createdAt', 'desc'),
         ...(filters?.limit ? [limit(filters.limit)] : []),
@@ -114,6 +124,7 @@ export class CallingsService {
     const docRef = await addDoc(collection(db, COLLECTION), {
       ...input,
       status: initialStatus,
+      hcVisible: callingVisibleToHighCouncil(input, initialStatus),
       proposedDate: serverTimestamp(),
       // Initialize empty approvals array and snapshot the quorum threshold
       // so mid-vote constant changes don't move the goalposts for this
@@ -141,7 +152,7 @@ export class CallingsService {
   }
 
   async advanceStatus(
-    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'unit'>,
+    workflow: Pick<CallingWorkflow, 'id' | 'workflowType' | 'callingName' | 'unit'>,
     newStatus: string,
     actor: AppUser,
     options: AdvanceStatusOptions = {},
@@ -160,6 +171,7 @@ export class CallingsService {
     await runTransaction(db, async (tx) => {
       tx.update(ref, {
         status: newStatus,
+        hcVisible: callingVisibleToHighCouncil(workflow, newStatus),
         updatedBy: actor.firebaseUid,
         updatedAt: serverTimestamp(),
         ...(dateField ? { [dateField]: serverTimestamp() } : {}),
@@ -218,6 +230,7 @@ export class CallingsService {
 
     await updateDoc(doc(db, COLLECTION, workflow.id), {
       status: previousStatus,
+      hcVisible: callingVisibleToHighCouncil(workflow, previousStatus),
       updatedBy: actor.firebaseUid,
       updatedAt: serverTimestamp(),
       ...(dateField ? { [dateField]: deleteField() } : {}),

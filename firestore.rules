@@ -118,8 +118,10 @@ service cloud.firestore {
     // History is append-only: no update/delete once written.
     // ---------------------------------------------------------------------
     match /callingWorkflows/{workflowId} {
-      allow read: if isAnyApprovedUser();
-      allow create: if isPresidency();
+      // High councilors only see a workflow once it reaches their stage -
+      // see visibleToHighCouncil() below and core/hc-visibility.ts.
+      allow read: if isPresidency() || (isHighCouncil() && visibleToHighCouncil(resource.data));
+      allow create: if isPresidency() && hiddenWhileProposed();
       allow delete: if isPresidency();
 
       // Presidency can update anything. High Council can do these things
@@ -130,7 +132,7 @@ service cloud.firestore {
       // mark a unit sustained, sustain (optionally combined with setting
       // apart in the same visit), set apart on its own, or undo an early
       // set-apart log.
-      allow update: if isPresidency()
+      allow update: if (isPresidency() && hiddenWhileProposed())
         || (isHighCouncil()
             && (isHighCouncilSelfVote()
                 || isHighCouncilQuorumAdvance()
@@ -140,14 +142,48 @@ service cloud.firestore {
                 || isHighCouncilUndoSetApart()));
 
       match /history/{entryId} {
-        allow read: if isAnyApprovedUser();
+        // Same visibility as the parent - a hidden workflow's audit trail
+        // would otherwise give it away.
+        allow read: if isPresidency()
+          || (isHighCouncil() && visibleToHighCouncil(
+                get(/databases/$(database)/documents/callingWorkflows/$(workflowId)).data));
         // Anyone who can advance the parent workflow can write the
         // matching history entry. HC members also write a history entry
         // when they cast a vote (they only touch history + the vote
         // array on the parent).
-        allow create: if isPresidency() || isHighCouncil();
+        allow create: if isPresidency()
+          || (isHighCouncil() && visibleToHighCouncil(
+                get(/databases/$(database)/documents/callingWorkflows/$(workflowId)).data));
         allow update, delete: if false;
       }
+    }
+
+    /**
+     * Whether a high councilor may read this workflow. `hcVisible` is
+     * written by the app on every status change (core/hc-visibility.ts):
+     * false while `proposed`, and for anything the high council never
+     * votes on (releases, ward callings, callings approved outside the
+     * stake) until it's ready for a unit to sustain. It's a stored flag
+     * rather than a status check because rules aren't filters - a high
+     * councilor's list query asks for `hcVisible == true`, which is what
+     * lets Firestore prove the query only returns readable documents.
+     * A document without the field (written before it existed) reads as
+     * hidden.
+     */
+    function visibleToHighCouncil(data) {
+      return data.get('hcVisible', false) == true;
+    }
+
+    /**
+     * Backstop for the app's own computation: whatever else it gets
+     * wrong, a `proposed` workflow can never be marked visible to the
+     * high council. Applies to every presidency create and update on
+     * both workflow collections; the high council's own write paths
+     * never touch `hcVisible` (each pins the fields it may change).
+     */
+    function hiddenWhileProposed() {
+      return !(request.resource.data.get('hcVisible', false) == true
+               && request.resource.data.status == 'proposed');
     }
 
     /**
@@ -339,20 +375,24 @@ service cloud.firestore {
     // whichever document is actually being written).
     // ---------------------------------------------------------------------
     match /priesthoodAdvancements/{advancementId} {
-      allow read: if isAnyApprovedUser();
-      allow create: if isPresidency();
+      allow read: if isPresidency() || (isHighCouncil() && visibleToHighCouncil(resource.data));
+      allow create: if isPresidency() && hiddenWhileProposed();
       allow delete: if isPresidency();
 
       // Also lets a high councilor record an ordination performed during
       // a unit visit on a Sunday, same own-name restriction as setting
       // apart on callingWorkflows above.
-      allow update: if isPresidency()
+      allow update: if (isPresidency() && hiddenWhileProposed())
         || (isHighCouncil()
             && (isHighCouncilSelfVote() || isHighCouncilQuorumAdvance() || isHighCouncilOrdain()));
 
       match /history/{entryId} {
-        allow read: if isAnyApprovedUser();
-        allow create: if isPresidency() || isHighCouncil();
+        allow read: if isPresidency()
+          || (isHighCouncil() && visibleToHighCouncil(
+                get(/databases/$(database)/documents/priesthoodAdvancements/$(advancementId)).data));
+        allow create: if isPresidency()
+          || (isHighCouncil() && visibleToHighCouncil(
+                get(/databases/$(database)/documents/priesthoodAdvancements/$(advancementId)).data));
         allow update, delete: if false;
       }
     }
