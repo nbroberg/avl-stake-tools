@@ -801,6 +801,8 @@ export class CallingDetailComponent {
     const w = this.workflow();
     const p = this.person();
     if (!w || !p) return null;
+    // Releases don't set anyone apart, so ordination is irrelevant.
+    if (w.workflowType === 'release') return null;
     if (w.setApartDate) return null;
     const req = priesthoodRequirementFor(w.callingName);
     if (req === 'none') return null;
